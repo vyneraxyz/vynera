@@ -22,7 +22,9 @@
 
 # misc
 .DS_Store
+Thumbs.db
 *.pem
+*.key
 
 # debug
 npm-debug.log*
@@ -35,6 +37,9 @@ yarn-error.log*
 
 # vercel
 .vercel
+
+# claude code
+.claude
 
 # typescript
 *.tsbuildinfo
