@@ -462,9 +462,43 @@ function BridgeApp() {
           )}
 
         {/* Footer */}
-        <footer className="mt-4 text-center text-[11px] text-c3 flex items-center justify-center gap-1.5">
-          <Shield size={11} aria-hidden="true" />
-          Community-built · Verifies addresses before signing
+        <footer className="mt-4 flex items-center justify-between px-1">
+          <span className="text-[11px] text-c3 flex items-center gap-1.5">
+            <Shield size={11} aria-hidden="true" />
+            Community-built · Verifies addresses before signing
+          </span>
+          <div className="flex items-center gap-3">
+            <a
+              href="https://github.com/vyneraxyz"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="GitHub"
+              className="opacity-50 hover:opacity-80 transition-opacity"
+            >
+              <Image
+                src="/icons8-github-logo.svg"
+                alt="GitHub"
+                width={22}
+                height={22}
+                style={{ filter: theme === "dark" ? "invert(1)" : "none" }}
+              />
+            </a>
+            <a
+              href="https://x.com/vynera_xyz"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="X / Twitter"
+              className="opacity-50 hover:opacity-80 transition-opacity"
+            >
+              <Image
+                src="/x--logo--black-100.png"
+                alt="X"
+                width={19}
+                height={19}
+                style={{ filter: theme === "dark" ? "invert(1)" : "none" }}
+              />
+            </a>
+          </div>
         </footer>
 
         {/* Transaction history */}
