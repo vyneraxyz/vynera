@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence } from "framer-motion";
-import { AlertCircle, CheckCircle2, ExternalLink, Layers, Moon, Shield, Sun } from "lucide-react";
+import { AlertCircle, CheckCircle2, ExternalLink, Moon, Shield, Sun } from "lucide-react";
 import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AmountInput } from "@/components/bridge/AmountInput";
@@ -331,7 +331,7 @@ function BridgeApp() {
                 height={36}
                 style={{ display: "block" }}
               />
-              <div className="text-c3 text-[11px]">Cross-Domain Bridge</div>
+              <div className="text-c3 text-[11px]">Cross-domain transfers</div>
             </div>
           </div>
 
@@ -359,13 +359,10 @@ function BridgeApp() {
         {/* Bridge card */}
         <main>
           <div className="surface rounded-3xl p-5 sm:p-6">
-            <div className="mb-1.5 flex items-center justify-between px-1">
+            <div className="mb-1.5 px-1">
               <h1 className="text-c1 text-base font-semibold tracking-tight">
-                Bridge AI3
+                Transfer AI3
               </h1>
-              <span className="text-[11px] text-c3 inline-flex items-center gap-1">
-                <Layers size={11} aria-hidden="true" /> XDM protocol
-              </span>
             </div>
             <p className="text-c2 text-[12.5px] mb-4 px-1 leading-snug">
               Move tokens between the Consensus chain and Auto EVM domain.
@@ -429,7 +426,7 @@ function BridgeApp() {
                   style={{ height: 52, fontSize: 15 }}
                 >
                   <WalletIcon />
-                  {direction === "e2c" ? "Connect EVM Wallet" : "Connect Wallet"}
+                  Connect Wallet
                 </button>
               )}
             </div>
@@ -465,7 +462,7 @@ function BridgeApp() {
         <footer className="mt-4 flex items-center justify-between px-1">
           <span className="text-[11px] text-c3 flex items-center gap-1.5">
             <Shield size={11} aria-hidden="true" />
-            Community-built · Verifies addresses before signing
+            Independent · Verifies addresses before signing
           </span>
           <div className="flex items-center gap-3">
             <a

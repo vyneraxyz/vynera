@@ -14,7 +14,7 @@ export const TREASURY_SS58 = "subcfcaGG2VXuLoLjuHMCj4aeLPTFBtGUvTahGc6zLrsMSNVo"
 
 /** Consensus → EVM: 100 consensus blocks (~10 min) */
 export const C2E_CHALLENGE_BLOCKS = 100;
-/** EVM → Consensus: 14 400 domain blocks (~24 h) */
+/** EVM → Consensus: 14 400 domain blocks (~30 h) */
 export const E2C_CHALLENGE_BLOCKS = 14_400;
 
 export function challengeBlocks(direction: "c2e" | "e2c"): number {
@@ -22,7 +22,7 @@ export function challengeBlocks(direction: "c2e" | "e2c"): number {
 }
 
 export function challengeHint(direction: "c2e" | "e2c"): string {
-  return direction === "c2e" ? "100 blocks · ~10 min" : "14 400 blocks · ~24 h";
+  return direction === "c2e" ? "100 blocks · ~10 min" : "14 400 blocks · ~30 h";
 }
 
 export const CHAINS = {

@@ -124,7 +124,7 @@ export function ReviewDialog({ direction, amount, fromAddress, toAddress, platfo
     : 0n;
   const netShannons = parsed - platformFeeShannons;
   const total = parsed + NETWORK_FEE_SHANNONS;
-  const timeHint = direction === "c2e" ? "~10 min" : "~24 h";
+  const timeHint = direction === "c2e" ? "~10 min" : "~30 h";
 
   return (
     <>

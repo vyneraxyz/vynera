@@ -20,18 +20,18 @@ const DESCRIPTION =
   "Community-built cross-domain bridge for moving AI3 tokens between the Autonomys Consensus chain and Auto EVM domain.";
 
 export const metadata: Metadata = {
-  title: "Vynera — Autonomys XDM Bridge",
+  title: "Vynera — Cross-domain transfers",
   description: DESCRIPTION,
   keywords: ["Vynera", "Autonomys", "XDM", "bridge", "AI3", "blockchain", "Auto EVM"],
   openGraph: {
-    title: "Vynera — Autonomys XDM Bridge",
+    title: "Vynera — Cross-domain transfers",
     description: DESCRIPTION,
     type: "website",
     images: [{ url: "/vynera_logo_black.png", width: 783, height: 185, alt: "Vynera" }],
   },
   twitter: {
     card: "summary",
-    title: "Vynera — Autonomys XDM Bridge",
+    title: "Vynera — Cross-domain transfers",
     description: DESCRIPTION,
     images: ["/vynera_logo_black.png"],
   },
