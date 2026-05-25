@@ -1,6 +1,5 @@
 "use client";
 
-import { useCallback } from "react";
 import { motion } from "framer-motion";
 import {
   AlertCircle,
@@ -11,6 +10,7 @@ import {
   Wallet,
   X,
 } from "lucide-react";
+import { useCallback } from "react";
 import { toAutonomysAddress, truncateAddress } from "@/lib/autonomys/addresses";
 import { formatAI3 } from "@/lib/autonomys/amounts";
 import { CHAINS } from "@/lib/constants";
@@ -311,7 +311,11 @@ export function StatusTimeline({ onClose, onSendAnother }: StatusTimelineProps) 
                         >
                           {step.label}
                         </div>
-                        <div className="text-[11.5px] text-c3">{step.hint}</div>
+                        <div className="text-[11.5px] text-c3">
+                        {step.id === "finalized"
+                          ? tx.direction === "c2e" ? "~10 min to destination" : "~30 h to destination"
+                          : step.hint}
+                      </div>
                       </div>
 
                       {stepActive && (
