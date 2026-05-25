@@ -566,7 +566,7 @@ function TxHistorySection({ history }: { history: StoredTx[] }) {
 function TxHistoryItem({ tx }: { tx: StoredTx }) {
   const explorerUrl = tx.hash
     ? tx.direction === "c2e"
-      ? `${CHAINS[tx.network].consensus.explorerBase}/extrinsics/${tx.hash}`
+      ? `${CHAINS[tx.network].consensus.explorerBase}/tx/${tx.hash}`
       : `${CHAINS[tx.network].evm.explorerBase}/tx/${tx.hash}`
     : null;
 

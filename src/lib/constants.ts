@@ -32,7 +32,7 @@ export const CHAINS = {
       networkId: "mainnet",
       ss58Prefix: 6094,
       decimals: 18,
-      explorerBase: "https://explorer.autonomys.xyz/mainnet/consensus",
+      explorerBase: "https://autonomys.subscan.io",
     },
     evm: {
       rpc: "wss://auto-evm.mainnet.autonomys.xyz/ws",
@@ -51,7 +51,7 @@ export const CHAINS = {
       networkId: "taurus",
       ss58Prefix: 6094,
       decimals: 18,
-      explorerBase: "https://explorer.autonomys.xyz/taurus/consensus",
+      explorerBase: "https://autonomys-taurus.subscan.io",
     },
     evm: {
       rpc: "wss://auto-evm.taurus.autonomys.xyz/ws",

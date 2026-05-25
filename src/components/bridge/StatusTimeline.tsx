@@ -130,7 +130,7 @@ export function StatusTimeline({ onClose, onSendAnother }: StatusTimelineProps) 
   const explorerUrl = (() => {
     if (!tx.hash) return null;
     if (tx.direction === "c2e") {
-      return `${CHAINS[network].consensus.explorerBase}/extrinsics/${tx.hash}`;
+      return `${CHAINS[network].consensus.explorerBase}/tx/${tx.hash}`;
     }
     // E2C uses the precompile — hash is an EVM tx hash
     return `${CHAINS[network].evm.explorerBase}/tx/${tx.hash}`;
