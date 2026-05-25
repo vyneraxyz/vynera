@@ -3,7 +3,7 @@
 import { AnimatePresence } from "framer-motion";
 import { AlertCircle, CheckCircle2, ExternalLink, Moon, Shield, Sun } from "lucide-react";
 import Image from "next/image";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AmountInput } from "@/components/bridge/AmountInput";
 import { DirectionToggle } from "@/components/bridge/DirectionToggle";
 import { RecipientInput } from "@/components/bridge/RecipientInput";
@@ -22,7 +22,7 @@ import {
   parseAI3,
 } from "@/lib/autonomys/amounts";
 import { buildAndSendXdm, buildAndSendXdmEvm } from "@/lib/autonomys/xdm";
-import { BLOCK_TIME_SECONDS, CHAINS, challengeBlocks, MIN_TRANSFER_SHANNONS, PLATFORM_FEE_BPS, TREASURY_SS58 } from "@/lib/constants";
+import { CHAINS, MIN_TRANSFER_SHANNONS, PLATFORM_FEE_BPS, TREASURY_SS58 } from "@/lib/constants";
 import { useTxStore } from "@/store/transactions";
 import { useWalletStore } from "@/store/wallet";
 import type { Direction, NetworkName, StoredTx } from "@/types";
@@ -91,112 +91,9 @@ function BridgeApp() {
   // Auto-reopen status overlay when background monitoring completes the transfer.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (activeTx?.phase === "executed") setOverlay("status");
+    if (activeTx?.phase === "finalized") setOverlay("status");
   }, [activeTx]);
 
-  // ── Persistent tx monitoring (survives overlay close) ────────────────────────
-
-  const txRef = useRef(activeTx);
-  useEffect(() => { txRef.current = activeTx; });
-  const monitorUnsubRef = useRef<(() => void) | null>(null);
-
-  // Block subscription: advances finalized → challenge and tracks progress blocks.
-  useEffect(() => {
-    let cancelled = false;
-    monitorUnsubRef.current?.();
-    monitorUnsubRef.current = null;
-
-    const subscribe = async () => {
-      try {
-        const { getApi } = await import("@/lib/autonomys/api");
-        const direction = txRef.current?.direction ?? "c2e";
-        const rpc =
-          direction === "c2e"
-            ? CHAINS[network].consensus.rpc
-            : CHAINS[network].evm.rpc;
-        const api = await getApi(rpc);
-
-        const unsub = await api.rpc.chain.subscribeFinalizedHeads((header) => {
-          if (cancelled) return;
-          const tx = txRef.current;
-          if (!tx) return;
-          const phase = tx.phase;
-          if (phase !== "finalized" && phase !== "challenge") return;
-
-          const period = challengeBlocks(tx.direction);
-          const blockNum = header.number.toNumber();
-
-          if (phase === "finalized" || tx.challengeStartBlock === undefined) {
-            updateActiveTxPhase("challenge", {
-              challengeStartBlock: blockNum,
-              challengeCurrentBlock: blockNum,
-              challengeStartTime: tx.challengeStartTime ?? Date.now(),
-            });
-          } else {
-            const elapsed = blockNum - tx.challengeStartBlock;
-            updateActiveTxPhase("challenge", { challengeCurrentBlock: blockNum });
-
-            if (elapsed >= period) {
-              unsub();
-              updateActiveTxPhase("relayed");
-              setTimeout(() => {
-                if (!cancelled) updateActiveTxPhase("executed");
-              }, 6000);
-            }
-          }
-        });
-
-        monitorUnsubRef.current = unsub;
-      } catch (err) {
-        console.error("Block subscription error:", err);
-      }
-    };
-
-    subscribe();
-
-    return () => {
-      cancelled = true;
-      monitorUnsubRef.current?.();
-      monitorUnsubRef.current = null;
-    };
-  }, [network, updateActiveTxPhase]);
-
-  // Fallback A: advance inBlock/finalized → challenge after 90 s.
-  useEffect(() => {
-    if (!activeTx) return;
-    const { id, phase, createdAt } = activeTx;
-    if (phase !== "inBlock" && phase !== "finalized") return;
-
-    const remaining = Math.max(0, createdAt + 90_000 - Date.now());
-    const timer = setTimeout(() => {
-      const current = useTxStore.getState().activeTx;
-      if (!current || current.id !== id) return;
-      if (current.phase !== "inBlock" && current.phase !== "finalized") return;
-      updateActiveTxPhase("challenge", { challengeStartTime: Date.now() });
-    }, remaining);
-    return () => clearTimeout(timer);
-  }, [activeTx, updateActiveTxPhase]);
-
-  // Fallback B: advance challenge → relayed → executed when period elapses.
-  useEffect(() => {
-    if (!activeTx || activeTx.phase !== "challenge") return;
-    const { id, direction, createdAt } = activeTx;
-
-    const challengeMs = challengeBlocks(direction) * BLOCK_TIME_SECONDS * 1000;
-    const remaining = Math.max(0, createdAt + 90_000 + challengeMs - Date.now());
-    const timer = setTimeout(() => {
-      const current = useTxStore.getState().activeTx;
-      if (!current || current.id !== id) return;
-      if (current.phase === "executed" || current.phase === "error") return;
-      updateActiveTxPhase("relayed");
-      setTimeout(() => {
-        const p = useTxStore.getState().activeTx;
-        if (!p || p.id !== id || p.phase === "executed" || p.phase === "error") return;
-        updateActiveTxPhase("executed");
-      }, 2000);
-    }, remaining);
-    return () => clearTimeout(timer);
-  }, [activeTx, updateActiveTxPhase]);
 
   // Derived validation
   const recipientValidation = validateRecipient(recipient, toChain);
@@ -263,7 +160,7 @@ function BridgeApp() {
       treasurySS58: TREASURY_SS58 || undefined,
       onPhaseChange: (phase: Parameters<typeof updateActiveTxPhase>[0], blockHash?: string) => {
         updateActiveTxPhase(phase, blockHash ? { hash: blockHash } : undefined);
-        if (phase === "inBlock" || phase === "finalized" || phase === "challenge") {
+        if (phase === "inBlock" || phase === "finalized") {
           setOverlay("status");
         }
       },

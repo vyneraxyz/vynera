@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback } from "react";
 import { motion } from "framer-motion";
 import {
   AlertCircle,
@@ -8,14 +8,12 @@ import {
   Check,
   CheckCircle2,
   ExternalLink,
-  Link2,
-  Shield,
   Wallet,
   X,
 } from "lucide-react";
 import { toAutonomysAddress, truncateAddress } from "@/lib/autonomys/addresses";
 import { formatAI3 } from "@/lib/autonomys/amounts";
-import { BLOCK_TIME_SECONDS, CHAINS, challengeBlocks, challengeHint } from "@/lib/constants";
+import { CHAINS } from "@/lib/constants";
 import { useTxStore } from "@/store/transactions";
 import { useWalletStore } from "@/store/wallet";
 import type { TxPhase } from "@/types";
@@ -25,22 +23,15 @@ import { RouteVisual } from "./ReviewDialog";
 
 const STEP_DEFS = [
   { id: "inBlock" as TxPhase, label: "Included in block", hint: "Source chain", Icon: Box },
-  { id: "challenge" as TxPhase, label: "Challenge period", hint: "", Icon: Shield },
-  { id: "relayed" as TxPhase, label: "Relayed", hint: "XDM message bridged", Icon: Link2 },
-  {
-    id: "executed" as TxPhase,
-    label: "Executed on destination",
-    hint: "Tokens available",
-    Icon: CheckCircle2,
-  },
+  { id: "finalized" as TxPhase, label: "Finalized", hint: "Tokens en route", Icon: CheckCircle2 },
 ] as const;
 
 const PHASE_TO_STEP: Partial<Record<TxPhase, number>> = {
   inBlock: 0,
-  finalized: 0,
+  finalized: 1,
   challenge: 1,
-  relayed: 2,
-  executed: 3,
+  relayed: 1,
+  executed: 1,
 };
 
 // ─── Spinner ─────────────────────────────────────────────────────────────────
@@ -72,20 +63,12 @@ export function StatusTimeline({ onClose, onSendAnother }: StatusTimelineProps) 
   const { activeTx, completeActiveTx } = useTxStore();
   const network = useWalletStore((s) => s.network);
 
-  // Tick every block during challenge so the time-based counter updates.
-  const [now, setNow] = useState(Date.now);
-  useEffect(() => {
-    if (activeTx?.phase !== "challenge") return;
-    const id = setInterval(() => setNow(Date.now()), BLOCK_TIME_SECONDS * 1000);
-    return () => clearInterval(id);
-  }, [activeTx]);
-
-  // Move tx to history on close (only when terminal state reached)
+  // Move tx to history on close when terminal state reached
   const handleCloseDialog = useCallback(() => {
     const current = useTxStore.getState().activeTx;
-    if (current?.phase === "executed" || current?.phase === "error") {
-      completeActiveTx();
-    }
+    const phase = current?.phase;
+    const isDone = phase === "finalized" || phase === "challenge" || phase === "relayed" || phase === "executed" || phase === "error";
+    if (isDone) completeActiveTx();
     onClose();
   }, [completeActiveTx, onClose]);
 
@@ -100,32 +83,10 @@ export function StatusTimeline({ onClose, onSendAnother }: StatusTimelineProps) 
   if (!tx) return null;
 
   const currentStep = PHASE_TO_STEP[tx.phase] ?? -1;
-  const isComplete = tx.phase === "executed";
+  const isComplete = tx.phase === "finalized" || tx.phase === "challenge" || tx.phase === "relayed" || tx.phase === "executed";
   const isError = tx.phase === "error";
 
-  const period = challengeBlocks(tx.direction);
-  const elapsedBlocks = (() => {
-    // Prefer real block numbers from the WebSocket subscription
-    if (tx.challengeCurrentBlock !== undefined && tx.challengeStartBlock !== undefined) {
-      return Math.min(period, tx.challengeCurrentBlock - tx.challengeStartBlock);
-    }
-    // Fall back to wall-clock time when WebSocket is unavailable
-    if (tx.challengeStartTime !== undefined) {
-      const elapsedMs = now - tx.challengeStartTime;
-      return Math.min(period, Math.floor(elapsedMs / (BLOCK_TIME_SECONDS * 1000)));
-    }
-    return 0;
-  })();
-  const challengeProgress = Math.min(100, (elapsedBlocks / period) * 100);
-
-  const progressPct = (() => {
-    if (isComplete) return 100;
-    const segments = [0, 10, 80, 92, 100];
-    const base = segments[currentStep] ?? 0;
-    const next = segments[currentStep + 1] ?? base;
-    const inner = currentStep === 1 ? (challengeProgress / 100) * (next - base) : 0;
-    return Math.min(100, base + inner);
-  })();
+  const progressPct = isComplete ? 100 : currentStep === 0 ? 50 : 10;
 
   const explorerUrl = (() => {
     if (!tx.hash) return null;
@@ -293,7 +254,6 @@ export function StatusTimeline({ onClose, onSendAnother }: StatusTimelineProps) 
                   const stepDone = i < currentStep || isComplete;
                   const stepActive = i === currentStep && !isComplete;
                   const { Icon } = step;
-                  const showSubProgress = stepActive && step.id === "challenge";
 
                   return (
                     <div key={step.id} className="flex items-center gap-3 py-2 px-1">
@@ -351,33 +311,10 @@ export function StatusTimeline({ onClose, onSendAnother }: StatusTimelineProps) 
                         >
                           {step.label}
                         </div>
-                        {showSubProgress ? (
-                          <div className="flex items-center gap-2 mt-0.5">
-                            <div
-                              className="h-1 flex-1 rounded-full"
-                              style={{ background: "rgba(255,255,255,0.05)" }}
-                            >
-                              <motion.div
-                                className="h-full rounded-full"
-                                animate={{ width: `${challengeProgress}%` }}
-                                transition={{ duration: 0.8, ease: "linear" }}
-                                style={{
-                                  background: "linear-gradient(90deg, #6E3AFF, #8A5DFF)",
-                                }}
-                              />
-                            </div>
-                            <span className="text-[11px] font-mono text-c2">
-                              {elapsedBlocks}/{period}
-                            </span>
-                          </div>
-                        ) : (
-                          <div className="text-[11.5px] text-c3">
-                            {step.id === "challenge" ? challengeHint(tx.direction) : step.hint}
-                          </div>
-                        )}
+                        <div className="text-[11.5px] text-c3">{step.hint}</div>
                       </div>
 
-                      {stepActive && !showSubProgress && (
+                      {stepActive && (
                         <span className="text-[11px] text-accent font-medium pulse-soft">
                           Working…
                         </span>
