@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { ArrowLeftRight } from "lucide-react";
 import Image from "next/image";
 import type { Direction } from "@/types";
@@ -61,12 +61,23 @@ export function DirectionToggle({ direction, onChange }: Props) {
 
   return (
     <fieldset className="seg" aria-label="Bridge direction" style={{ border: "none", padding: 0, margin: 0 }}>
-      <div className="seg-pill active">
-        <ChainBadge chain={left} size="sm" />
-        <div className="flex flex-col items-start text-left">
-          <span className="text-[10px] uppercase tracking-wider text-c3">From</span>
-          <ChainLabel chain={left} />
-        </div>
+      <div className="seg-pill active overflow-hidden">
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={`left-${direction}`}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.1 }}
+            className="flex items-center gap-2"
+          >
+            <ChainBadge chain={left} size="sm" />
+            <div className="flex flex-col items-start text-left">
+              <span className="text-[10px] uppercase tracking-wider text-c3">From</span>
+              <ChainLabel chain={left} />
+            </div>
+          </motion.div>
+        </AnimatePresence>
       </div>
 
       <motion.button
@@ -81,12 +92,23 @@ export function DirectionToggle({ direction, onChange }: Props) {
         <ArrowLeftRight size={18} />
       </motion.button>
 
-      <div className="seg-pill active">
-        <div className="flex flex-col items-end text-right">
-          <span className="text-[10px] uppercase tracking-wider text-c3">To</span>
-          <ChainLabel chain={right} />
-        </div>
-        <ChainBadge chain={right} size="sm" />
+      <div className="seg-pill active overflow-hidden">
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={`right-${direction}`}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.1 }}
+            className="flex items-center gap-2"
+          >
+            <ChainBadge chain={right} size="sm" />
+            <div className="flex flex-col items-start text-left">
+              <span className="text-[10px] uppercase tracking-wider text-c3">To</span>
+              <ChainLabel chain={right} />
+            </div>
+          </motion.div>
+        </AnimatePresence>
       </div>
     </fieldset>
   );

@@ -4,6 +4,15 @@ import { useCallback } from "react";
 import { useWalletStore } from "@/store/wallet";
 import type { WalletAccount } from "@/types";
 
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error("Connection timed out")), ms)
+    ),
+  ]);
+}
+
 export function useWalletActions() {
   const {
     setConnected,
@@ -13,7 +22,6 @@ export function useWalletActions() {
     setBalance,
     setBalanceLoading,
     selectedAddress,
-    network,
     disconnect,
     setEvmAddress,
     setEvmError,
@@ -101,17 +109,22 @@ export function useWalletActions() {
     try {
       const { getApi } = await import("@/lib/autonomys/api");
       const { CHAINS } = await import("@/lib/constants");
-      const chainConfig = CHAINS[network];
-      const api = await getApi(chainConfig.consensus.rpc);
-      const result = await api.query.system.account(selectedAddress);
-      const free = ((result as unknown) as { data: { free: { toBigInt(): bigint } } }).data.free.toBigInt();
+      const chainConfig = CHAINS.Mainnet;
+      const free = await withTimeout(
+        (async () => {
+          const api = await getApi(chainConfig.consensus.rpc);
+          const result = await api.query.system.account(selectedAddress);
+          return ((result as unknown) as { data: { free: { toBigInt(): bigint } } }).data.free.toBigInt();
+        })(),
+        12_000,
+      );
       setBalance(free);
     } catch (err: unknown) {
       console.error("Failed to fetch balance:", err);
     } finally {
       setBalanceLoading(false);
     }
-  }, [selectedAddress, network, setBalance, setBalanceLoading]);
+  }, [selectedAddress, setBalance, setBalanceLoading]);
 
   const connectEvm = useCallback(async () => {
     const { connectEvmWallet } = await import("@/lib/evm/wallet");
@@ -136,55 +149,55 @@ export function useWalletActions() {
     try {
       const { getApi } = await import("@/lib/autonomys/api");
       const { CHAINS } = await import("@/lib/constants");
-      const api = await getApi(CHAINS[network].evm.rpc);
+      const balance = await withTimeout(
+        (async () => {
+          const api = await getApi(CHAINS.Mainnet.evm.rpc);
+          let bal: bigint | null = null;
 
-      let balance: bigint | null = null;
+          // Frontier exposes eth_getBalance on the Substrate WS port
+          try {
+            type EthRpc = { getBalance(addr: string): Promise<{ toBigInt?(): bigint; toString(): string }> };
+            const ethRpc = (api.rpc as unknown as { eth?: EthRpc }).eth;
+            if (ethRpc?.getBalance) {
+              const result = await ethRpc.getBalance(evmAddress);
+              bal = result.toBigInt ? result.toBigInt() : BigInt(result.toString());
+            }
+          } catch {
+            // eth namespace unavailable on this node
+          }
 
-      // Frontier exposes eth_getBalance on the Substrate WS port
-      try {
-        type EthRpc = { getBalance(addr: string): Promise<{ toBigInt?(): bigint; toString(): string }> };
-        const ethRpc = (api.rpc as unknown as { eth?: EthRpc }).eth;
-        if (ethRpc?.getBalance) {
-          const result = await ethRpc.getBalance(evmAddress);
-          balance = result.toBigInt ? result.toBigInt() : BigInt(result.toString());
-        }
-      } catch {
-        // eth namespace unavailable on this node
-      }
+          // HTTP JSON-RPC fallback
+          if (bal === null) {
+            try {
+              const res = await fetch(CHAINS.Mainnet.evm.httpRpc, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ jsonrpc: "2.0", method: "eth_getBalance", params: [evmAddress, "latest"], id: 1 }),
+              });
+              const data = (await res.json()) as { result?: string };
+              if (data.result) bal = BigInt(data.result);
+            } catch {
+              // HTTP endpoint unavailable
+            }
+          }
 
-      // HTTP JSON-RPC fallback
-      if (balance === null) {
-        try {
-          const res = await fetch(CHAINS[network].evm.httpRpc, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              jsonrpc: "2.0",
-              method: "eth_getBalance",
-              params: [evmAddress, "latest"],
-              id: 1,
-            }),
-          });
-          const data = (await res.json()) as { result?: string };
-          if (data.result) balance = BigInt(data.result);
-        } catch {
-          // HTTP endpoint unavailable
-        }
-      }
+          // MetaMask/Rabby provider as last resort
+          if (bal === null) {
+            const { getEvmBalance } = await import("@/lib/evm/wallet");
+            bal = await getEvmBalance(evmAddress);
+          }
 
-      // MetaMask/Rabby provider as last resort
-      if (balance === null) {
-        const { getEvmBalance } = await import("@/lib/evm/wallet");
-        balance = await getEvmBalance(evmAddress);
-      }
-
+          return bal;
+        })(),
+        12_000,
+      );
       setEvmBalance(balance);
     } catch (err: unknown) {
       console.error("Failed to fetch EVM balance:", err);
     } finally {
       setEvmBalanceLoading(false);
     }
-  }, [evmAddress, network, setEvmBalance, setEvmBalanceLoading]);
+  }, [evmAddress, setEvmBalance, setEvmBalanceLoading]);
 
   return { loadAccountsFromExtension, fetchBalance, fetchEvmBalance, disconnect, connectEvm, disconnectEvmWallet };
 }

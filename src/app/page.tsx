@@ -25,7 +25,7 @@ import { buildAndSendXdm, buildAndSendXdmEvm } from "@/lib/autonomys/xdm";
 import { CHAINS, MIN_TRANSFER_SHANNONS, PLATFORM_FEE_BPS, TREASURY_SS58 } from "@/lib/constants";
 import { useTxStore } from "@/store/transactions";
 import { useWalletStore } from "@/store/wallet";
-import type { Direction, NetworkName, StoredTx } from "@/types";
+import type { Direction, StoredTx } from "@/types";
 
 type Overlay = "review" | "signing" | "status" | null;
 
@@ -38,10 +38,10 @@ export default function BridgePage() {
 }
 
 function BridgeApp() {
-  const { connected, selectedAddress, balanceShannons, balanceLoading, network, theme, evmAddress, evmBalanceShannons, evmBalanceLoading } =
+  const { connected, selectedAddress, balanceShannons, balanceLoading, theme, evmAddress, evmBalanceShannons, evmBalanceLoading } =
     useWalletStore();
   const { fetchBalance, fetchEvmBalance, loadAccountsFromExtension, connectEvm } = useWalletActions();
-  const { setTheme, setNetwork } = useWalletStore();
+  const { setTheme } = useWalletStore();
   const { activeTx, history: txHistory, setActiveTx, updateActiveTxPhase } = useTxStore();
 
   const [direction, setDirection] = useState<Direction>("c2e");
@@ -131,7 +131,7 @@ function BridgeApp() {
   const handleConfirmReview = useCallback(async () => {
     if (!fromAddress || parsedAmount === null) return;
 
-    const chainConfig = CHAINS[network];
+    const chainConfig = CHAINS.Mainnet;
     const domainId = chainConfig.evm.domainId;
 
     const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -142,7 +142,7 @@ function BridgeApp() {
       fromAddress,
       toAddress: recipient,
       amount: parsedAmount.toString(),
-      network,
+      network: "Mainnet",
       phase: "signing",
       createdAt: Date.now(),
     });
@@ -193,7 +193,6 @@ function BridgeApp() {
     parsedAmount,
     direction,
     recipient,
-    network,
     setActiveTx,
     updateActiveTxPhase,
   ]);
@@ -233,12 +232,6 @@ function BridgeApp() {
           </div>
 
           <div className="flex items-center gap-2">
-            <NetworkPill
-              network={network}
-              onToggle={() =>
-                setNetwork(network === "Mainnet" ? "Testnet" : "Mainnet")
-              }
-            />
             <WalletConnect />
             <button
               type="button"
@@ -258,7 +251,7 @@ function BridgeApp() {
           <div className="surface rounded-3xl p-5 sm:p-6">
             <div className="mb-1.5 px-1">
               <h1 className="text-c1 text-base font-semibold tracking-tight">
-                Transfer AI3
+                XDM Transfer AI3
               </h1>
             </div>
             <p className="text-c2 text-[12.5px] mb-4 px-1 leading-snug">
@@ -463,8 +456,8 @@ function TxHistorySection({ history }: { history: StoredTx[] }) {
 function TxHistoryItem({ tx }: { tx: StoredTx }) {
   const explorerUrl = tx.hash
     ? tx.direction === "c2e"
-      ? `${CHAINS[tx.network].consensus.explorerBase}/tx/${tx.hash}`
-      : `${CHAINS[tx.network].evm.explorerBase}/tx/${tx.hash}`
+      ? `${CHAINS.Mainnet.consensus.explorerBase}/tx/${tx.hash}`
+      : `${CHAINS.Mainnet.evm.explorerBase}/tx/${tx.hash}`
     : null;
 
   const isError = tx.phase === "error";
@@ -507,42 +500,6 @@ function TxHistoryItem({ tx }: { tx: StoredTx }) {
         )}
       </div>
     </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-
-
-function NetworkPill({
-  network,
-  onToggle,
-}: {
-  network: NetworkName;
-  onToggle: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onToggle}
-      className="hairline-2 rounded-full pl-2 pr-3 py-1 flex items-center gap-2 text-xs btn-ghost"
-      aria-label={`Network: ${network}. Click to switch.`}
-    >
-      <span
-        className="relative flex items-center justify-center"
-        style={{ width: 8, height: 8 }}
-        aria-hidden="true"
-      >
-        <span
-          className="absolute inset-0 rounded-full"
-          style={{ background: "#6E3AFF" }}
-        />
-        <span
-          className="absolute -inset-1 rounded-full pulse-soft"
-          style={{ background: "#6E3AFF", opacity: 0.25 }}
-        />
-      </span>
-      <span className="text-c2">{network}</span>
-    </button>
   );
 }
 

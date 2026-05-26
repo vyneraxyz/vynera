@@ -1,5 +1,5 @@
 export type Direction = "c2e" | "e2c";
-export type NetworkName = "Mainnet" | "Testnet";
+export type NetworkName = "Mainnet";
 export type Chain = "consensus" | "evm";
 
 export type TxPhase =

@@ -45,25 +45,6 @@ export const CHAINS = {
       explorerBase: "https://explorer.auto-evm.mainnet.autonomys.xyz",
     },
   },
-  Testnet: {
-    consensus: {
-      rpc: "wss://rpc.taurus.autonomys.xyz/ws",
-      networkId: "taurus",
-      ss58Prefix: 6094,
-      decimals: 18,
-      explorerBase: "https://autonomys-taurus.subscan.io",
-    },
-    evm: {
-      rpc: "wss://auto-evm.taurus.autonomys.xyz/ws",
-      /** HTTP JSON-RPC endpoint for direct eth_getBalance queries */
-      httpRpc: "https://auto-evm.taurus.autonomys.xyz/",
-      networkId: "taurus",
-      domainId: 0,
-      chainId: 490000,
-      decimals: 18,
-      explorerBase: "https://explorer.auto-evm.taurus.autonomys.xyz",
-    },
-  },
 } as const;
 
 export const NETWORK_FEE_AI3 = 0.001;

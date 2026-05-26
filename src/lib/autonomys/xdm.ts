@@ -41,7 +41,7 @@ export interface XdmTransferParams {
   /** Amount in Shannons as BigInt */
   amountShannons: bigint;
   domainId: number;
-  /** EVM chain ID for the Auto EVM domain (870 = Mainnet, 490000 = Testnet) */
+  /** EVM chain ID for the Auto EVM domain (870 = Mainnet) */
   evmChainId?: number;
   /** Platform fee in basis points (100 = 1%). Only applied for c2e via batchAll. */
   platformFeeBps?: number;
@@ -189,13 +189,12 @@ async function ensureEvmChain(chainId: number): Promise<void> {
     await eth.request({ method: "wallet_switchEthereumChain", params: [{ chainId: hex }] });
   } catch (err: unknown) {
     if ((err as { code?: number }).code === 4902) {
-      const isMainnet = chainId === 870;
       await eth.request({
         method: "wallet_addEthereumChain",
         params: [{
           chainId: hex,
-          chainName: isMainnet ? "Autonomys Auto EVM" : "Autonomys Auto EVM Taurus",
-          rpcUrls: [isMainnet ? "https://auto-evm.mainnet.autonomys.xyz/" : "https://auto-evm.taurus.autonomys.xyz/"],
+          chainName: "Autonomys Auto EVM",
+          rpcUrls: ["https://auto-evm.mainnet.autonomys.xyz/"],
           nativeCurrency: { name: "AI3", symbol: "AI3", decimals: 18 },
         }],
       });

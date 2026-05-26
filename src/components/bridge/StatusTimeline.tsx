@@ -15,7 +15,6 @@ import { toAutonomysAddress, truncateAddress } from "@/lib/autonomys/addresses";
 import { formatAI3 } from "@/lib/autonomys/amounts";
 import { CHAINS } from "@/lib/constants";
 import { useTxStore } from "@/store/transactions";
-import { useWalletStore } from "@/store/wallet";
 import type { TxPhase } from "@/types";
 import { RouteVisual } from "./ReviewDialog";
 
@@ -61,8 +60,6 @@ interface StatusTimelineProps {
 
 export function StatusTimeline({ onClose, onSendAnother }: StatusTimelineProps) {
   const { activeTx, completeActiveTx } = useTxStore();
-  const network = useWalletStore((s) => s.network);
-
   // Move tx to history on close when terminal state reached
   const handleCloseDialog = useCallback(() => {
     const current = useTxStore.getState().activeTx;
@@ -91,10 +88,10 @@ export function StatusTimeline({ onClose, onSendAnother }: StatusTimelineProps) 
   const explorerUrl = (() => {
     if (!tx.hash) return null;
     if (tx.direction === "c2e") {
-      return `${CHAINS[network].consensus.explorerBase}/tx/${tx.hash}`;
+      return `${CHAINS.Mainnet.consensus.explorerBase}/tx/${tx.hash}`;
     }
     // E2C uses the precompile — hash is an EVM tx hash
-    return `${CHAINS[network].evm.explorerBase}/tx/${tx.hash}`;
+    return `${CHAINS.Mainnet.evm.explorerBase}/tx/${tx.hash}`;
   })();
 
   const fromChain = tx.direction === "c2e" ? "consensus" : "evm";

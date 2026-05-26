@@ -2,13 +2,11 @@
 
 import { create } from "zustand";
 import type { WalletAccount } from "@/types";
-import type { NetworkName } from "@/types";
 
 interface WalletState {
   connected: boolean;
   accounts: WalletAccount[];
   selectedAddress: string | null;
-  network: NetworkName;
   theme: "dark" | "light";
   /** Balance in Shannons */
   balanceShannons: bigint;
@@ -24,7 +22,6 @@ interface WalletState {
   setConnected: (v: boolean) => void;
   setAccounts: (accounts: WalletAccount[]) => void;
   selectAddress: (address: string) => void;
-  setNetwork: (n: NetworkName) => void;
   setTheme: (t: "dark" | "light") => void;
   setBalance: (shannons: bigint) => void;
   setBalanceLoading: (v: boolean) => void;
@@ -42,7 +39,6 @@ export const useWalletStore = create<WalletState>()((set) => ({
   connected: false,
   accounts: [],
   selectedAddress: null,
-  network: "Mainnet",
   theme: "dark",
   balanceShannons: 0n,
   balanceLoading: false,
@@ -56,7 +52,6 @@ export const useWalletStore = create<WalletState>()((set) => ({
   setConnected: (v) => set({ connected: v }),
   setAccounts: (accounts) => set({ accounts }),
   selectAddress: (address) => set({ selectedAddress: address }),
-  setNetwork: (network) => set({ network }),
   setTheme: (theme) => {
     set({ theme });
     if (typeof document !== "undefined") {

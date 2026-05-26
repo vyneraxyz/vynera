@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { RefreshCw, Copy, Check } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
-import { ChainBadge } from "./DirectionToggle";
+import { AnimatePresence, motion } from "framer-motion";
+import { Check, Copy, RefreshCw } from "lucide-react";
+import { useCallback, useState } from "react";
 import { toAutonomysAddress, truncateAddress } from "@/lib/autonomys/addresses";
 import { formatAI3 } from "@/lib/autonomys/amounts";
 import type { Chain } from "@/types";
+import { ChainBadge } from "./DirectionToggle";
 
 interface Props {
   chain: Chain;
@@ -32,6 +32,7 @@ function AddressChip({ address }: { address: string }) {
 
   return (
     <button
+      type="button"
       onClick={copy}
       className="tip-trigger relative inline-flex items-center gap-1.5 px-2 py-1 -mx-2 -my-1 rounded-md transition hover:bg-white/[0.04] font-mono text-c1"
       title={address}
@@ -77,6 +78,7 @@ export function SenderBlock({
       <div className="flex items-center justify-between mb-2">
         <span className="text-[11px] uppercase tracking-wider text-c3">From wallet</span>
         <button
+          type="button"
           onClick={onRefresh}
           className="tip-trigger relative text-c3 hover:text-c1 transition p-1 -m-1 rounded-md"
           aria-label="Refresh balance"
@@ -97,19 +99,28 @@ export function SenderBlock({
       </div>
 
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <ChainBadge chain={chain} size="md" />
-          <div className="min-w-0">
-            {address ? (
-              <AddressChip address={chain === "consensus" ? toAutonomysAddress(address) : address} />
-            ) : (
-              <span className="font-mono text-c3 text-sm">—</span>
-            )}
-            <div className="text-[11px] text-c3 -mt-0.5 ml-0.5">
-              {chain === "consensus" ? "Consensus chain" : "Auto EVM domain"}
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={chain}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.1 }}
+            className="flex items-center gap-2.5 min-w-0"
+          >
+            <ChainBadge chain={chain} size="md" />
+            <div className="min-w-0">
+              {address ? (
+                <AddressChip address={chain === "consensus" ? toAutonomysAddress(address) : address} />
+              ) : (
+                <span className="font-mono text-c3 text-sm">—</span>
+              )}
+              <div className="text-[11px] text-c3 -mt-0.5 ml-0.5">
+                {chain === "consensus" ? "Consensus chain" : "Auto EVM domain"}
+              </div>
             </div>
-          </div>
-        </div>
+          </motion.div>
+        </AnimatePresence>
 
         <div className="text-right shrink-0 ml-3">
           <div className="text-[11px] uppercase tracking-wider text-c3">Balance</div>
