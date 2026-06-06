@@ -14,9 +14,6 @@ const CSP = [
     "wss://rpc.mainnet.autonomys.xyz",
     "wss://auto-evm.mainnet.autonomys.xyz",
     "https://auto-evm.mainnet.autonomys.xyz",
-    "wss://rpc.taurus.autonomys.xyz",
-    "wss://auto-evm.taurus.autonomys.xyz",
-    "https://auto-evm.taurus.autonomys.xyz",
   ].join(" "),
   "frame-ancestors 'none'",
 ].join("; ");
@@ -35,6 +32,10 @@ const nextConfig: NextConfig = {
             value: "camera=(), microphone=(), geolocation=()",
           },
           { key: "Content-Security-Policy", value: CSP },
+          {
+            key: "Strict-Transport-Security",
+            value: "max-age=63072000; includeSubDomains; preload",
+          },
         ],
       },
     ];
