@@ -8,6 +8,9 @@ export const FEE_BPS_ABOVE = 100;
 /** Hard cap the pre-sign check enforces regardless of tiers */
 export const MAX_FEE_BPS = FEE_BPS_BASE;
 
+/** Referral program switch — off for now; flip to re-enable payouts, the ?ref= capture and the invite card */
+export const REFERRALS_ENABLED = false;
+
 /** Share of the platform fee paid to the referrer, in percent */
 export const REFERRAL_SHARE_PCT = 20n;
 
