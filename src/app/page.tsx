@@ -14,7 +14,7 @@ import { SummaryCard } from "@/components/bridge/SummaryCard";
 import { useWalletActions } from "@/components/wallet/useWalletActions";
 import { WalletConnect } from "@/components/wallet/WalletConnect";
 import { WalletProvider } from "@/components/wallet/WalletProvider";
-import { validateRecipient } from "@/lib/autonomys/addresses";
+import { recipientNotice, validateRecipient } from "@/lib/autonomys/addresses";
 import {
   computeMax,
   formatAI3,
@@ -97,6 +97,10 @@ function BridgeApp() {
 
   // Derived validation
   const recipientValidation = validateRecipient(recipient, toChain);
+  const notice = recipientNotice(recipient, toChain, {
+    treasurySS58: TREASURY_SS58,
+    ownAddress: toChain === "consensus" ? selectedAddress : evmAddress,
+  });
   const parsedAmount = parseAI3(amount);
   const insufficient = isInsufficient(parsedAmount, effectiveBalance);
 
@@ -274,6 +278,7 @@ function BridgeApp() {
                 value={recipient}
                 onChange={setRecipient}
                 targetChain={toChain}
+                notice={notice}
                 disabled={!walletConnected}
               />
 
@@ -402,6 +407,7 @@ function BridgeApp() {
             fromAddress={fromAddress}
             toAddress={recipient}
             platformFeeEnabled={direction === "c2e"}
+            recipientNotice={notice}
             onConfirm={handleConfirmReview}
             onClose={closeReview}
           />

@@ -2,18 +2,20 @@
 
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Check, X, AlertCircle, Info } from "lucide-react";
-import { validateRecipient } from "@/lib/autonomys/addresses";
+import { Check, X, AlertCircle, AlertTriangle, Info } from "lucide-react";
+import { validateRecipient, type RecipientNotice } from "@/lib/autonomys/addresses";
 import type { Chain } from "@/types";
 
 interface Props {
   value: string;
   onChange: (v: string) => void;
   targetChain: Chain;
+  /** Extra context about a valid recipient (own wallet, treasury, …) */
+  notice?: RecipientNotice | null;
   disabled?: boolean;
 }
 
-export function RecipientInput({ value, onChange, targetChain, disabled }: Props) {
+export function RecipientInput({ value, onChange, targetChain, notice, disabled }: Props) {
   const [debounced, setDebounced] = useState(value);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -26,6 +28,8 @@ export function RecipientInput({ value, onChange, targetChain, disabled }: Props
   }, [value]);
 
   const validation = validateRecipient(debounced, targetChain);
+  // Only show the notice once it describes what's actually typed
+  const shownNotice = validation.state === "valid" && debounced === value ? notice : null;
   const expectsEvm = targetChain === "evm";
   const placeholder = expectsEvm ? "0x…" : "su…";
   const defaultHelper = expectsEvm
@@ -113,15 +117,20 @@ export function RecipientInput({ value, onChange, targetChain, disabled }: Props
 
       <div
         id="recipient-helper"
+        role={shownNotice?.level === "warning" ? "alert" : undefined}
         className={`text-[11.5px] mt-1.5 ml-1 flex items-center gap-1.5 ${
-          validation.state === "valid"
-            ? "text-accent"
-            : validation.state === "invalid"
-              ? "text-c1"
-              : "text-c3"
+          shownNotice?.level === "warning"
+            ? "text-warning"
+            : validation.state === "valid"
+              ? "text-accent"
+              : validation.state === "invalid"
+                ? "text-c1"
+                : "text-c3"
         }`}
       >
-        {validation.state === "invalid" ? (
+        {shownNotice?.level === "warning" ? (
+          <AlertTriangle size={12} className="shrink-0" />
+        ) : validation.state === "invalid" ? (
           <AlertCircle size={12} />
         ) : validation.state === "valid" ? null : (
           <Info size={12} />
@@ -129,7 +138,9 @@ export function RecipientInput({ value, onChange, targetChain, disabled }: Props
         <span>
           {validation.state === "idle"
             ? defaultHelper
-            : validation.message}
+            : shownNotice
+              ? `${validation.message} · ${shownNotice.message}`
+              : validation.message}
         </span>
       </div>
     </div>

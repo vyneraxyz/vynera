@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
+import { headers } from "next/headers";
 import Script from "next/script";
 import "./globals.css";
 import { Providers } from "./providers";
@@ -37,9 +38,13 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  // Set by src/proxy.ts; reading headers also opts every page into dynamic
+  // rendering, which nonce-based CSP requires
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
+
   return (
     <html
       lang="en"
@@ -48,7 +53,7 @@ export default function RootLayout({
     >
       <head>
         {/* Prevent theme flash: read localStorage before React paint */}
-        <Script id="xdm-theme-init" strategy="beforeInteractive">
+        <Script id="xdm-theme-init" strategy="beforeInteractive" nonce={nonce}>
           {`(function(){try{var t=localStorage.getItem('xdm-theme');if(t==='light')document.documentElement.classList.add('light');}catch(e){}})();`}
         </Script>
       </head>

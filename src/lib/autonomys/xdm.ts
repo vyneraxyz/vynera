@@ -1,6 +1,8 @@
 import type { ApiPromise } from "@autonomys/auto-utils";
 import { createTransferToConsensusTxData, TRANSPORTER_PRECOMPILE_ADDRESS, transporterTransfer } from "@autonomys/auto-xdm";
 import type { Direction, TxPhase } from "@/types";
+import { PLATFORM_FEE_BPS } from "@/lib/constants";
+import { verifyPrecompileCalldata, verifyXdmCall, type DecodedCall } from "./verify";
 
 // Minimal structural interfaces so we don't depend on either copy of @polkadot/types.
 interface SignerOptions {
@@ -91,6 +93,14 @@ export async function buildAndSendXdm(params: XdmTransferParams): Promise<() => 
     } else {
       extrinsic = transporterTransfer(api, destination, account, amountShannons);
     }
+    verifyXdmCall(extrinsic.method as unknown as DecodedCall, {
+      direction,
+      toAddress,
+      amountShannons,
+      domainId,
+      maxFeeBps: PLATFORM_FEE_BPS,
+      treasurySS58,
+    });
   } catch (err: unknown) {
     onError(errorMessage(err, "Failed to build XDM extrinsic"));
     return () => {};
@@ -202,6 +212,11 @@ async function ensureEvmChain(chainId: number): Promise<void> {
       throw err;
     }
   }
+  // Some wallets resolve the switch request without actually switching.
+  const active = await eth.request<string>({ method: "eth_chainId" });
+  if (parseInt(active, 16) !== chainId) {
+    throw new Error(`Wallet is on chain ${parseInt(active, 16)}, expected ${chainId}`);
+  }
 }
 
 export async function buildAndSendXdmEvm(params: XdmTransferParams): Promise<() => void> {
@@ -214,6 +229,7 @@ export async function buildAndSendXdmEvm(params: XdmTransferParams): Promise<() 
     if (txData.to !== TRANSPORTER_PRECOMPILE_ADDRESS) {
       throw new Error(`Unexpected precompile address: ${txData.to}`);
     }
+    verifyPrecompileCalldata(txData.data, toAddress, amountShannons);
     calldata = txData.data;
     precompileAddress = txData.to;
   } catch (err: unknown) {

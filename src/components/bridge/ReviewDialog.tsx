@@ -1,8 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { Info, X } from "lucide-react";
-import { toAutonomysAddress, truncateAddress } from "@/lib/autonomys/addresses";
+import { AlertTriangle, Info, X } from "lucide-react";
+import { toAutonomysAddress, truncateAddress, type RecipientNotice } from "@/lib/autonomys/addresses";
 import { formatAI3, formatShannons, parseAI3 } from "@/lib/autonomys/amounts";
 import { NETWORK_FEE_SHANNONS, PLATFORM_FEE_BPS, challengeHint } from "@/lib/constants";
 import type { Direction } from "@/types";
@@ -14,6 +15,7 @@ interface Props {
   fromAddress: string;
   toAddress: string;
   platformFeeEnabled: boolean;
+  recipientNotice?: RecipientNotice | null;
   onConfirm: () => void;
   onClose: () => void;
 }
@@ -115,7 +117,10 @@ function SummaryRow({
   );
 }
 
-export function ReviewDialog({ direction, amount, fromAddress, toAddress, platformFeeEnabled, onConfirm, onClose }: Props) {
+export function ReviewDialog({ direction, amount, fromAddress, toAddress, platformFeeEnabled, recipientNotice, onConfirm, onClose }: Props) {
+  const [acknowledged, setAcknowledged] = useState(false);
+  const needsAck = !!recipientNotice?.requiresAck;
+  const canConfirm = !needsAck || acknowledged;
   const fromChain = direction === "c2e" ? "consensus" : "evm";
   const toChain = direction === "c2e" ? "evm" : "consensus";
   const parsed = parseAI3(amount) ?? 0n;
@@ -237,6 +242,34 @@ export function ReviewDialog({ direction, amount, fromAddress, toAddress, platfo
               />
             </div>
 
+            {/* Recipient warning */}
+            {recipientNotice?.level === "warning" && (
+              <div
+                role="alert"
+                className="rounded-xl px-3 py-2.5 grid gap-2 text-[12.5px] mb-3"
+                style={{
+                  background: "var(--warning-bg)",
+                  border: "1px solid var(--warning-border)",
+                  color: "var(--text-1)",
+                }}
+              >
+                <div className="flex gap-2 items-start">
+                  <AlertTriangle size={14} className="mt-0.5 shrink-0 text-warning" aria-hidden="true" />
+                  <span>{recipientNotice.message}</span>
+                </div>
+                {needsAck && (
+                  <label className="flex gap-2 items-center cursor-pointer select-none ml-[22px]">
+                    <input
+                      type="checkbox"
+                      checked={acknowledged}
+                      onChange={(e) => setAcknowledged(e.target.checked)}
+                    />
+                    <span>I control this address and want to send funds to it</span>
+                  </label>
+                )}
+              </div>
+            )}
+
             {/* Info banner */}
             <div
               className="rounded-xl px-3 py-2.5 flex gap-2 items-start text-[12.5px] mb-5"
@@ -265,7 +298,8 @@ export function ReviewDialog({ direction, amount, fromAddress, toAddress, platfo
               <button
                 type="button"
                 onClick={onConfirm}
-                className="btn-accent rounded-xl py-3 px-4 flex-[2] text-sm font-medium text-white"
+                disabled={!canConfirm}
+                className="btn-accent rounded-xl py-3 px-4 flex-[2] text-sm font-medium text-white disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Confirm in wallet
               </button>

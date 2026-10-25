@@ -29,6 +29,8 @@ export const CHAINS = {
   Mainnet: {
     consensus: {
       rpc: "wss://rpc.mainnet.autonomys.xyz/ws",
+      /** Pinned so a hijacked or misconfigured RPC can't serve a different chain */
+      genesisHash: "0x66455a580aabff303720aa83adbe6c44502922251c03ba73686d5245da9e21bd",
       networkId: "mainnet",
       ss58Prefix: 6094,
       decimals: 18,
@@ -36,6 +38,7 @@ export const CHAINS = {
     },
     evm: {
       rpc: "wss://auto-evm.mainnet.autonomys.xyz/ws",
+      genesisHash: "0xdb98c50e9ab1c34fe7927d97373f82e3c0d11490813a7c0b8dac2cd9a793a7dd",
       /** HTTP JSON-RPC endpoint for direct eth_getBalance queries */
       httpRpc: "https://auto-evm.mainnet.autonomys.xyz/",
       networkId: "mainnet",

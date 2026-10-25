@@ -1,17 +1,41 @@
 import type { ApiPromise } from "@autonomys/auto-utils";
 import { createConnection } from "@autonomys/auto-utils";
+import { CHAINS } from "@/lib/constants";
 
 const cache = new Map<string, Promise<ApiPromise>>();
 
-/** Return a cached ApiPromise singleton for the given RPC URL. */
+/** Pinned genesis hash for each known RPC URL. */
+const EXPECTED_GENESIS: Record<string, string> = Object.fromEntries(
+  Object.values(CHAINS).flatMap((c) => [
+    [c.consensus.rpc, c.consensus.genesisHash],
+    [c.evm.rpc, c.evm.genesisHash],
+  ])
+);
+
+/**
+ * Return a cached ApiPromise singleton for the given RPC URL.
+ * Rejects if the node reports a genesis hash other than the pinned one.
+ */
 export function getApi(rpcUrl: string): Promise<ApiPromise> {
   const existing = cache.get(rpcUrl);
   if (existing) return existing;
 
-  const promise = createConnection(rpcUrl).catch((err: unknown) => {
-    cache.delete(rpcUrl);
-    throw err;
-  });
+  const promise = createConnection(rpcUrl)
+    .then(async (api) => {
+      const expected = EXPECTED_GENESIS[rpcUrl];
+      const actual = api.genesisHash.toHex();
+      if (expected && actual !== expected) {
+        await api.disconnect().catch(() => {});
+        throw new Error(
+          `RPC ${rpcUrl} serves an unexpected chain (genesis ${actual}). Refusing to continue.`
+        );
+      }
+      return api;
+    })
+    .catch((err: unknown) => {
+      cache.delete(rpcUrl);
+      throw err;
+    });
 
   cache.set(rpcUrl, promise);
   return promise;

@@ -1,22 +1,6 @@
 import type { NextConfig } from "next";
 
-const CSP = [
-  "default-src 'self'",
-  // 'unsafe-inline' required: Next.js inline scripts + theme-init Script
-  // 'wasm-unsafe-eval' required: @polkadot/wasm-crypto
-  "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'",
-  "style-src 'self' 'unsafe-inline'",
-  // next/font self-hosts Google Fonts at build time — no external font origin needed
-  "font-src 'self'",
-  "img-src 'self' data: blob:",
-  [
-    "connect-src 'self'",
-    "wss://rpc.mainnet.autonomys.xyz",
-    "wss://auto-evm.mainnet.autonomys.xyz",
-    "https://auto-evm.mainnet.autonomys.xyz",
-  ].join(" "),
-  "frame-ancestors 'none'",
-].join("; ");
+// Content-Security-Policy is set per request (with a nonce) in src/proxy.ts
 
 const nextConfig: NextConfig = {
   async headers() {
@@ -29,9 +13,9 @@ const nextConfig: NextConfig = {
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           {
             key: "Permissions-Policy",
-            value: "camera=(), microphone=(), geolocation=()",
+            value: "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
           },
-          { key: "Content-Security-Policy", value: CSP },
+          { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
           {
             key: "Strict-Transport-Security",
             value: "max-age=63072000; includeSubDomains; preload",
