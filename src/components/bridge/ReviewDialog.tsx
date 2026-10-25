@@ -4,17 +4,20 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { AlertTriangle, Info, X } from "lucide-react";
 import { toAutonomysAddress, truncateAddress, type RecipientNotice } from "@/lib/autonomys/addresses";
-import { formatAI3, formatShannons, parseAI3 } from "@/lib/autonomys/amounts";
-import { NETWORK_FEE_SHANNONS, PLATFORM_FEE_BPS, challengeHint } from "@/lib/constants";
-import type { Direction } from "@/types";
+import { formatAI3, formatShannons } from "@/lib/autonomys/amounts";
+import { formatUsd, useAi3Price } from "@/lib/price";
+import { CHAIN_LABEL, CHAIN_TOKEN } from "@/lib/routes";
+import type { RouteQuote } from "@/lib/transfer/quote";
+import type { Chain } from "@/types";
 import { ChainBadge } from "./DirectionToggle";
+import { QuoteRows, Row as SummaryRow } from "./SummaryCard";
 
 interface Props {
-  direction: Direction;
-  amount: string;
+  from: Chain;
+  to: Chain;
+  quote: RouteQuote;
   fromAddress: string;
   toAddress: string;
-  platformFeeEnabled: boolean;
   recipientNotice?: RecipientNotice | null;
   onConfirm: () => void;
   onClose: () => void;
@@ -26,20 +29,30 @@ function RouteVisual({
   fromAddr,
   toAddr,
   animated = false,
+  via,
 }: {
   fromChain: string;
   toChain: string;
   fromAddr: string;
   toAddr: string;
   animated?: boolean;
+  /** Bridge label under the arrow; defaults from the chain pair */
+  via?: string;
 }) {
+  const bridge =
+    via ??
+    (fromChain === "ethereum" || toChain === "ethereum"
+      ? fromChain === "consensus" || toChain === "consensus"
+        ? "XDM + Hyperlane"
+        : "Hyperlane"
+      : "XDM");
   return (
     <div className="flex items-center justify-between gap-2">
       <div className="flex flex-col items-center text-center flex-1">
         <ChainBadge chain={fromChain} size="lg" />
         <div className="mt-2 text-[11px] uppercase tracking-wider text-c3">From</div>
         <div className="text-c1 text-sm font-medium">
-          {fromChain === "consensus" ? "Consensus" : "Auto EVM"}
+          {CHAIN_LABEL[fromChain as Chain] ?? fromChain}
         </div>
         <div className="font-mono text-[11px] text-c3 mt-0.5">
           {truncateAddress(fromAddr, 6, 4)}
@@ -78,14 +91,14 @@ function RouteVisual({
             strokeLinejoin="round"
           />
         </svg>
-        <div className="text-[10px] uppercase tracking-wider text-c3 mt-1">XDM</div>
+        <div className="text-[10px] uppercase tracking-wider text-c3 mt-1 text-center">{bridge}</div>
       </div>
 
       <div className="flex flex-col items-center text-center flex-1">
         <ChainBadge chain={toChain} size="lg" />
         <div className="mt-2 text-[11px] uppercase tracking-wider text-c3">To</div>
         <div className="text-c1 text-sm font-medium">
-          {toChain === "consensus" ? "Consensus" : "Auto EVM"}
+          {CHAIN_LABEL[toChain as Chain] ?? toChain}
         </div>
         <div className="font-mono text-[11px] text-c3 mt-0.5">
           {truncateAddress(toAddr, 6, 4)}
@@ -97,39 +110,17 @@ function RouteVisual({
 
 export { RouteVisual };
 
-function SummaryRow({
-  label,
-  value,
-  hint,
-}: {
-  label: React.ReactNode;
-  value: React.ReactNode;
-  hint?: string;
-}) {
-  return (
-    <div className="flex items-start justify-between">
-      <div>
-        <div className="text-c2">{label}</div>
-        {hint && <div className="text-c3 text-[11px]">{hint}</div>}
-      </div>
-      <div className="text-c1">{value}</div>
-    </div>
-  );
-}
-
-export function ReviewDialog({ direction, amount, fromAddress, toAddress, platformFeeEnabled, recipientNotice, onConfirm, onClose }: Props) {
+export function ReviewDialog({ from, to, quote, fromAddress, toAddress, recipientNotice, onConfirm, onClose }: Props) {
+  const usd = useAi3Price();
   const [acknowledged, setAcknowledged] = useState(false);
   const needsAck = !!recipientNotice?.requiresAck;
   const canConfirm = !needsAck || acknowledged;
-  const fromChain = direction === "c2e" ? "consensus" : "evm";
-  const toChain = direction === "c2e" ? "evm" : "consensus";
-  const parsed = parseAI3(amount) ?? 0n;
-  const platformFeeShannons = platformFeeEnabled
-    ? (parsed * BigInt(PLATFORM_FEE_BPS)) / 10000n
-    : 0n;
-  const netShannons = parsed - platformFeeShannons;
-  const total = parsed + NETWORK_FEE_SHANNONS;
-  const timeHint = direction === "c2e" ? "~10 min" : "~30 h";
+  const fromChain = from;
+  const toChain = to;
+  const parsed = quote.legs[0].amount;
+  const total = parsed + quote.sourceGas;
+  const multiLeg = quote.legs.length > 1;
+  const usdValue = formatUsd(parsed, usd);
 
   return (
     <>
@@ -183,10 +174,11 @@ export function ReviewDialog({ direction, amount, fromAddress, toAddress, platfo
                 <div className="text-[11px] uppercase tracking-wider text-c3">You are sending</div>
                 <div className="mt-1 text-4xl font-semibold font-mono tracking-tight text-c1">
                   {formatAI3(parsed, 4)}
-                  <span className="text-c2 text-base font-medium ml-2">AI3</span>
+                  <span className="text-c2 text-base font-medium ml-2">{CHAIN_TOKEN[from]}</span>
                 </div>
                 <div className="text-c3 text-[11px] mt-1 font-mono">
-                  ≈ {formatShannons(parsed)}
+                  {usdValue ? `≈ ${usdValue} · ` : ""}
+                  {formatShannons(parsed)}
                 </div>
               </div>
               <div className="mt-5">
@@ -201,42 +193,13 @@ export function ReviewDialog({ direction, amount, fromAddress, toAddress, platfo
 
             {/* Fee breakdown */}
             <div className="surface-2 rounded-2xl p-4 grid gap-2 text-sm mb-4">
-              {platformFeeEnabled ? (
-                <>
-                  <SummaryRow
-                    label="Recipient receives"
-                    value={<span className="font-mono">{formatAI3(netShannons, 4)} AI3</span>}
-                  />
-                  <SummaryRow
-                    label={<span className="text-c3">Platform fee ({PLATFORM_FEE_BPS / 100}%)</span>}
-                    value={<span className="font-mono text-c3">{formatAI3(platformFeeShannons, 4)} AI3</span>}
-                  />
-                  <div style={{ borderTop: "1px solid var(--border-1)" }} />
-                </>
-              ) : (
-                <>
-                  <SummaryRow
-                    label={<span className="text-c3">Platform fee</span>}
-                    value={<span className="text-c3">free</span>}
-                  />
-                  <div style={{ borderTop: "1px solid var(--border-1)" }} />
-                </>
-              )}
-              <SummaryRow
-                label="Network fee"
-                value={<span className="font-mono">{formatAI3(NETWORK_FEE_SHANNONS, 4)} AI3</span>}
-              />
-              <SummaryRow
-                label="Challenge period"
-                value={<span className="font-mono">{timeHint}</span>}
-                hint={challengeHint(direction)}
-              />
+              <QuoteRows from={from} to={to} quote={quote} />
               <div style={{ borderTop: "1px solid var(--border-1)" }} />
               <SummaryRow
                 label={<span className="text-c1 font-medium">Total deducted</span>}
                 value={
                   <span className="text-c1 font-mono font-medium">
-                    {formatAI3(total, 4)} AI3
+                    {formatAI3(total, 4)} {CHAIN_TOKEN[from]}
                   </span>
                 }
               />
@@ -281,8 +244,9 @@ export function ReviewDialog({ direction, amount, fromAddress, toAddress, platfo
             >
               <Info size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
               <span>
-                Tokens become available on the destination after the challenge period completes.
-                This is normal XDM behavior — it cannot be skipped.
+                {multiLeg
+                  ? `This route has two steps. After step 1 arrives on ${CHAIN_LABEL[quote.legs[0].to]}, Vynera asks you to sign step 2 — keep this page open or come back later.`
+                  : "Tokens become available on the destination once the bridge delivers them. Vynera tracks the transfer and can notify you."}
               </span>
             </div>
 
@@ -301,7 +265,7 @@ export function ReviewDialog({ direction, amount, fromAddress, toAddress, platfo
                 disabled={!canConfirm}
                 className="btn-accent rounded-xl py-3 px-4 flex-[2] text-sm font-medium text-white disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                Confirm in wallet
+                {multiLeg ? "Sign step 1" : "Confirm in wallet"}
               </button>
             </div>
           </div>

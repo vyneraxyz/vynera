@@ -21,6 +21,7 @@ const DESCRIPTION =
   "Community-built cross-domain bridge for moving AI3 tokens between the Autonomys Consensus chain and Auto EVM domain.";
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://vynera.xyz"),
   title: "Vynera | Cross-domain transfers",
   description: DESCRIPTION,
   keywords: ["Vynera", "Autonomys", "XDM", "bridge", "AI3", "blockchain", "Auto EVM"],

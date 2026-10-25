@@ -2,9 +2,11 @@ import { u8aToHex } from "@polkadot/util";
 import { decodeAddress, encodeAddress, isEthereumAddress } from "@polkadot/util-crypto";
 import type { Chain } from "@/types";
 
-/** Re-encode any SS58 address to the Autonomys-specific prefix (6094). */
+/** Re-encode any SS58 address (or 32-byte hex public key) to the Autonomys prefix (6094). */
 export function toAutonomysAddress(addr: string): string {
-  if (!addr || addr.startsWith("0x")) return addr;
+  if (!addr) return addr;
+  // 20-byte EVM addresses stay as they are; 32-byte hex keys become SS58
+  if (addr.startsWith("0x") && addr.length !== 66) return addr;
   try {
     return encodeAddress(decodeAddress(addr), 6094);
   } catch {
@@ -40,7 +42,7 @@ export function validateRecipient(
   const trimmed = value.trim();
   if (!trimmed) return { state: "idle" };
 
-  const expectsEvm = targetChain === "evm";
+  const expectsEvm = targetChain !== "consensus";
   const isEvm = isValidEthereumAddress(trimmed);
   const isSub = isValidSubstrateAddress(trimmed);
 
@@ -53,7 +55,7 @@ export function validateRecipient(
   if (expectsEvm && isSub) {
     return {
       state: "invalid",
-      message: "This is a Substrate address — Auto EVM needs 0x… format",
+      message: "This is a Substrate address — this network needs 0x… format",
     };
   }
   if (!expectsEvm && isEvm) {
@@ -78,7 +80,7 @@ export function samePublicKey(a: string, b: string): boolean {
 }
 
 function sameAccount(a: string, b: string, targetChain: Chain): boolean {
-  return targetChain === "evm"
+  return targetChain !== "consensus"
     ? a.trim().toLowerCase() === b.trim().toLowerCase()
     : samePublicKey(a, b);
 }

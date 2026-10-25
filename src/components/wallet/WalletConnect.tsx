@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { CheckCircle2, ChevronDown, LogOut, RefreshCw, Wallet } from "lucide-react";
+import { CheckCircle2, ChevronDown, ExternalLink, LogOut, RefreshCw, Smartphone, Wallet } from "lucide-react";
+import type { DiscoveredWallet } from "@/lib/evm/wallet";
 import { toAutonomysAddress, truncateAddress } from "@/lib/autonomys/addresses";
 import { useWalletStore } from "@/store/wallet";
 import type { WalletAccount } from "@/types";
@@ -36,9 +37,9 @@ export function WalletConnect() {
     setLoadingSubstrate(false);
   };
 
-  const handleConnectEvm = async () => {
+  const handleConnectEvm = async (rdns?: string) => {
     setLoadingEvm(true);
-    await connectEvm();
+    await connectEvm(rdns);
     setLoadingEvm(false);
   };
 
@@ -191,15 +192,7 @@ export function WalletConnect() {
                 </>
               ) : (
                 <>
-                  <button
-                    type="button"
-                    onClick={handleConnectEvm}
-                    disabled={loadingEvm}
-                    className="w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs text-c2 hover:text-c1 hover:bg-white/[0.04] transition"
-                  >
-                    {loadingEvm ? <RefreshCw size={13} className="spin-anim" /> : <Wallet size={13} />}
-                    Connect MetaMask / Rabby
-                  </button>
+                  <EvmConnectOptions onConnect={handleConnectEvm} loading={loadingEvm} />
                   {evmError && <p className="text-[10px] text-c2 px-2 pb-1">{evmError}</p>}
                 </>
               )}
@@ -211,11 +204,87 @@ export function WalletConnect() {
   );
 }
 
+/** One button per installed EVM wallet (EIP-6963), or a generic one */
+function EvmConnectOptions({ onConnect, loading }: { onConnect: (rdns?: string) => void; loading: boolean }) {
+  const [wallets, setWallets] = useState<DiscoveredWallet[]>([]);
+  useEffect(() => {
+    let alive = true;
+    import("@/lib/evm/wallet").then(({ discoverEvmWallets }) =>
+      discoverEvmWallets().then((w) => alive && setWallets(w))
+    );
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const cls = "w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs text-c2 hover:text-c1 hover:bg-white/[0.04] transition";
+  if (wallets.length === 0) {
+    return (
+      <button type="button" onClick={() => onConnect()} disabled={loading} className={cls}>
+        {loading ? <RefreshCw size={13} className="spin-anim" /> : <Wallet size={13} />}
+        Connect MetaMask / Rabby
+      </button>
+    );
+  }
+  return (
+    <>
+      {wallets.map((w) => (
+        <button key={w.rdns} type="button" onClick={() => onConnect(w.rdns)} disabled={loading} className={cls}>
+          {/* eslint-disable-next-line @next/next/no-img-element -- wallet icons are data: URIs announced by the extension */}
+          <img src={w.icon} alt="" width={14} height={14} className="rounded-sm" />
+          Connect {w.name}
+        </button>
+      ))}
+    </>
+  );
+}
+
+function isMobile(): boolean {
+  return typeof navigator !== "undefined" && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+}
+
+/** On phones without an injected wallet, open Vynera inside a wallet app's browser */
+function MobileWalletLinks() {
+  const [show, setShow] = useState(false);
+  useEffect(() => {
+    const w = window as Window & { ethereum?: unknown; injectedWeb3?: Record<string, unknown> };
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setShow(isMobile() && !w.ethereum && !Object.keys(w.injectedWeb3 ?? {}).length);
+  }, []);
+  if (!show) return null;
+
+  const url = window.location.href;
+  const links = [
+    { name: "SubWallet", href: `https://mobile.subwallet.app/browser?url=${encodeURIComponent(url)}` },
+    { name: "MetaMask", href: `https://metamask.app.link/dapp/${url.replace(/^https?:\/\//, "")}` },
+  ];
+  return (
+    <>
+      <div className="my-1 mt-2" style={{ borderTop: "1px solid var(--border-1)" }} />
+      <div className="px-2 py-1 mb-1">
+        <p className="text-[10px] uppercase tracking-wider text-c3 flex items-center gap-1">
+          <Smartphone size={10} aria-hidden="true" /> Open in a wallet app
+        </p>
+      </div>
+      {links.map((l) => (
+        <a
+          key={l.name}
+          href={l.href}
+          rel="noopener noreferrer"
+          className="w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs text-c2 hover:text-c1 hover:bg-white/[0.04] transition"
+        >
+          <ExternalLink size={13} /> {l.name}
+        </a>
+      ))}
+    </>
+  );
+}
+
 function ConnectSection({
   onConnectSubstrate, onConnectEvm, loadingSubstrate, loadingEvm, extensionError, evmError,
 }: {
   onConnectSubstrate: () => void;
-  onConnectEvm: () => void;
+  onConnectEvm: (rdns?: string) => void;
   loadingSubstrate: boolean;
   loadingEvm: boolean;
   extensionError: string | null;
@@ -242,16 +311,9 @@ function ConnectSection({
       <div className="px-2 py-1 mb-1">
         <p className="text-[10px] uppercase tracking-wider text-c3">EVM</p>
       </div>
-      <button
-        type="button"
-        onClick={onConnectEvm}
-        disabled={loadingEvm}
-        className="w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs text-c2 hover:text-c1 hover:bg-white/[0.04] transition"
-      >
-        {loadingEvm ? <RefreshCw size={13} className="spin-anim" /> : <Wallet size={13} />}
-        Connect MetaMask / Rabby
-      </button>
+      <EvmConnectOptions onConnect={onConnectEvm} loading={loadingEvm} />
       {evmError && <p className="text-[10px] text-c2 px-2 pb-1">{evmError}</p>}
+      <MobileWalletLinks />
     </>
   );
 }

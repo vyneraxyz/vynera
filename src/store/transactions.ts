@@ -2,7 +2,7 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { StoredTx, TxPhase } from "@/types";
+import type { StoredLeg, StoredTx, TxPhase } from "@/types";
 
 const STORAGE_KEY = "xdm-transactions";
 
@@ -15,8 +15,17 @@ interface TxState {
     phase: TxPhase,
     extra?: Partial<Pick<StoredTx, "hash" | "error" | "challengeStartBlock" | "challengeCurrentBlock" | "finalizedBlock" | "challengeStartTime">>
   ) => void;
+  /** Patch a transfer wherever it lives (active or history) */
+  updateTx: (id: string, patch: Partial<StoredTx>) => void;
+  updateLeg: (id: string, legIndex: number, patch: Partial<StoredLeg>) => void;
+  /** Bring a transfer from history back as the active one (e.g. to sign its next leg) */
+  activate: (id: string) => void;
   completeActiveTx: () => void;
   clearActiveTx: () => void;
+}
+
+function patchTx(tx: StoredTx | null, id: string, fn: (t: StoredTx) => StoredTx): StoredTx | null {
+  return tx && tx.id === id ? fn(tx) : tx;
 }
 
 export const useTxStore = create<TxState>()(
@@ -33,12 +42,42 @@ export const useTxStore = create<TxState>()(
         set({ activeTx: { ...current, phase, ...extra } });
       },
 
+      updateTx: (id, patch) => {
+        const fn = (t: StoredTx) => ({ ...t, ...patch });
+        set((s) => ({
+          activeTx: patchTx(s.activeTx, id, fn),
+          history: s.history.map((t) => (t.id === id ? fn(t) : t)),
+        }));
+      },
+
+      updateLeg: (id, legIndex, patch) => {
+        const fn = (t: StoredTx) => ({
+          ...t,
+          legs: t.legs?.map((l, i) => (i === legIndex ? { ...l, ...patch } : l)),
+        });
+        set((s) => ({
+          activeTx: patchTx(s.activeTx, id, fn),
+          history: s.history.map((t) => (t.id === id ? fn(t) : t)),
+        }));
+      },
+
+      activate: (id) => {
+        const s = get();
+        if (s.activeTx?.id === id) return;
+        const tx = s.history.find((t) => t.id === id);
+        if (!tx) return;
+        set({
+          activeTx: tx,
+          history: [...(s.activeTx ? [s.activeTx] : []), ...s.history.filter((t) => t.id !== id)],
+        });
+      },
+
       completeActiveTx: () => {
         const current = get().activeTx;
         if (!current) return;
         set((state) => ({
           activeTx: null,
-          history: [current, ...state.history].slice(0, 50),
+          history: [current, ...state.history.filter((t) => t.id !== current.id)].slice(0, 50),
         }));
       },
 
@@ -46,7 +85,6 @@ export const useTxStore = create<TxState>()(
     }),
     {
       name: STORAGE_KEY,
-      // BigInt serialization: store as string
       storage: {
         getItem: (name) => {
           try {
@@ -75,3 +113,9 @@ export const useTxStore = create<TxState>()(
     }
   )
 );
+
+/** All stored transfers, active first */
+export function allTransfers(): StoredTx[] {
+  const { activeTx, history } = useTxStore.getState();
+  return activeTx ? [activeTx, ...history.filter((t) => t.id !== activeTx.id)] : history;
+}
