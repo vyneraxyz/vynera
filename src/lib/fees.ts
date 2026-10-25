@@ -1,9 +1,10 @@
 import { SHANNONS_PER_AI3 } from "@/lib/constants";
 
 // Platform fee for Consensus → Auto EVM transfers, tiered like tax brackets:
-// 3% on the first 1000 AI3, 1% on everything above.
+// FEE_BPS_BASE on the first FEE_TIER_THRESHOLD, FEE_BPS_ABOVE on the rest.
+// Currently a flat 1% (both tiers equal).
 export const FEE_TIER_THRESHOLD = 1000n * SHANNONS_PER_AI3;
-export const FEE_BPS_BASE = 300;
+export const FEE_BPS_BASE = 100;
 export const FEE_BPS_ABOVE = 100;
 /** Hard cap the pre-sign check enforces regardless of tiers */
 export const MAX_FEE_BPS = FEE_BPS_BASE;

@@ -38,7 +38,10 @@ export function Row({
   );
 }
 
-export const FEE_TIER_HINT = `${FEE_BPS_BASE / 100}% up to ${formatAI3(FEE_TIER_THRESHOLD, 0)} AI3, ${FEE_BPS_ABOVE / 100}% above`;
+export const FEE_TIER_HINT =
+  FEE_BPS_BASE === FEE_BPS_ABOVE
+    ? `${FEE_BPS_BASE / 100}% of the amount`
+    : `${FEE_BPS_BASE / 100}% up to ${formatAI3(FEE_TIER_THRESHOLD, 0)} AI3, ${FEE_BPS_ABOVE / 100}% above`;
 
 /** Fee, gas and per-leg route lines shared by the summary and the review dialog */
 export function QuoteRows({ from, to, quote }: { from: Chain; to: Chain; quote: RouteQuote | null }) {
