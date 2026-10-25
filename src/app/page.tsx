@@ -18,7 +18,7 @@ import { WalletProvider } from "@/components/wallet/WalletProvider";
 import { recipientNotice, toAutonomysAddress, truncateAddress, validateRecipient } from "@/lib/autonomys/addresses";
 import { computeMax, formatAI3, parseAI3 } from "@/lib/autonomys/amounts";
 import { MIN_TRANSFER_SHANNONS, TREASURY_SS58 } from "@/lib/constants";
-import { REFERRAL_SHARE_PCT } from "@/lib/fees";
+import { REFERRAL_SHARE_PCT, REFERRALS_ENABLED } from "@/lib/fees";
 import { getWai3Balance } from "@/lib/hyperlane";
 import { captureReferralFromUrl, getReferrer, referralLink } from "@/lib/referral";
 import { CHAIN_LABEL, CHAIN_TOKEN, legSigner, planRoute } from "@/lib/routes";
@@ -381,7 +381,7 @@ function BridgeApp() {
           </button>
         )}
 
-        {selectedAddress && <ReferralCard address={selectedAddress} referrer={referrer} />}
+        {REFERRALS_ENABLED && selectedAddress && <ReferralCard address={selectedAddress} referrer={referrer} />}
 
         {/* Footer */}
         <footer className="mt-4 flex items-center justify-between px-1">
