@@ -3,23 +3,36 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { AlertCircle, X } from "lucide-react";
 import { formatAI3, formatShannons, parseAI3 } from "@/lib/autonomys/amounts";
-import { MIN_TRANSFER_SHANNONS, NETWORK_FEE_SHANNONS } from "@/lib/constants";
+import { MIN_TRANSFER_SHANNONS } from "@/lib/constants";
+import { formatUsd, useAi3Price } from "@/lib/price";
 
 interface Props {
   value: string;
   onChange: (v: string) => void;
   balanceShannons: bigint;
-  onMax: () => void;
+  /** Fill a share of the spendable balance: 0.25, 0.5 or 1 (max) */
+  onPreset: (fraction: 0.25 | 0.5 | 1) => void;
+  /** Gas paid in the same token on the source chain (0 when gas is paid in ETH) */
+  gasShannons: bigint;
+  token?: string;
   disabled?: boolean;
 }
 
-export function AmountInput({ value, onChange, balanceShannons, onMax, disabled }: Props) {
+const PRESETS = [
+  { label: "25%", fraction: 0.25 },
+  { label: "50%", fraction: 0.5 },
+  { label: "Max", fraction: 1 },
+] as const;
+
+export function AmountInput({ value, onChange, balanceShannons, onPreset, gasShannons, token = "AI3", disabled }: Props) {
+  const usd = useAi3Price();
   const parsed = parseAI3(value);
   const belowMin = parsed !== null && parsed > 0n && parsed < MIN_TRANSFER_SHANNONS;
   const insufficient =
     parsed !== null &&
     parsed > 0n &&
-    parsed + NETWORK_FEE_SHANNONS > balanceShannons;
+    parsed + gasShannons > balanceShannons;
+  const usdValue = parsed !== null ? formatUsd(parsed, usd) : null;
 
   const hasError = belowMin || insufficient;
 
@@ -36,7 +49,7 @@ export function AmountInput({ value, onChange, balanceShannons, onMax, disabled 
         </label>
         <span className="text-[11px] text-c3">
           Balance:{" "}
-          <span className="font-mono text-c2">{formatAI3(balanceShannons, 4)} AI3</span>
+          <span className="font-mono text-c2">{formatAI3(balanceShannons, 4)} {token}</span>
         </span>
       </div>
 
@@ -84,16 +97,22 @@ export function AmountInput({ value, onChange, balanceShannons, onMax, disabled 
           )}
         </AnimatePresence>
 
-        <button
-          onClick={onMax}
-          type="button"
-          className="btn-ghost rounded-full px-2.5 py-1 text-[11px] font-medium uppercase tracking-wider shrink-0"
-          aria-label="Set maximum amount"
-        >
-          Max
-        </button>
+        <div className="text-c1 font-medium font-mono text-sm pl-1 shrink-0">{token}</div>
+      </div>
 
-        <div className="text-c1 font-medium font-mono text-sm pl-1 shrink-0">AI3</div>
+      <div className="mt-1.5 flex items-center gap-1.5">
+        {PRESETS.map((p) => (
+          <button
+            key={p.label}
+            type="button"
+            onClick={() => onPreset(p.fraction)}
+            className="btn-ghost rounded-full px-2.5 py-1 text-[11px] font-medium uppercase tracking-wider"
+            aria-label={p.fraction === 1 ? "Set maximum amount" : `Set ${p.label} of balance`}
+          >
+            {p.label}
+          </button>
+        ))}
+        {usdValue && <span className="ml-auto text-[12px] text-c2 font-mono">≈ {usdValue}</span>}
       </div>
 
       <div id="amount-helper" className="mt-1.5 ml-1 flex items-center justify-between">

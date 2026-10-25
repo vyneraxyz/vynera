@@ -6,7 +6,7 @@ import { CHAINS } from "@/lib/constants";
 export function proxy(request: NextRequest) {
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
   const isDev = process.env.NODE_ENV === "development";
-  const { consensus, evm } = CHAINS.Mainnet;
+  const { consensus, evm, ethereum } = CHAINS.Mainnet;
 
   const csp = [
     "default-src 'self'",
@@ -19,7 +19,13 @@ export function proxy(request: NextRequest) {
     // next/font self-hosts Google Fonts at build time — no external font origin needed
     "font-src 'self'",
     "img-src 'self' data: blob:",
-    ["connect-src 'self'", new URL(consensus.rpc).origin, new URL(evm.rpc).origin, new URL(evm.httpRpc).origin].join(" "),
+    [
+      "connect-src 'self'",
+      new URL(consensus.rpc).origin,
+      new URL(evm.rpc).origin,
+      new URL(evm.httpRpc).origin,
+      new URL(ethereum.httpRpc).origin,
+    ].join(" "),
     "object-src 'none'",
     "base-uri 'none'",
     "form-action 'none'",

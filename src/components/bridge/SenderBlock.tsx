@@ -5,6 +5,7 @@ import { Check, Copy, RefreshCw } from "lucide-react";
 import { useCallback, useState } from "react";
 import { toAutonomysAddress, truncateAddress } from "@/lib/autonomys/addresses";
 import { formatAI3 } from "@/lib/autonomys/amounts";
+import { CHAIN_TOKEN } from "@/lib/routes";
 import type { Chain } from "@/types";
 import { ChainBadge } from "./DirectionToggle";
 
@@ -116,7 +117,7 @@ export function SenderBlock({
                 <span className="font-mono text-c3 text-sm">—</span>
               )}
               <div className="text-[11px] text-c3 -mt-0.5 ml-0.5">
-                {chain === "consensus" ? "Consensus chain" : "Auto EVM domain"}
+                {chain === "consensus" ? "Consensus chain" : chain === "evm" ? "Auto EVM domain" : "Ethereum mainnet"}
               </div>
             </div>
           </motion.div>
@@ -128,7 +129,7 @@ export function SenderBlock({
             <span className="font-mono tabular-nums">
               {formatAI3(balanceShannons, 4)}
             </span>{" "}
-            <span className="text-c3 font-mono text-xs">AI3</span>
+            <span className="text-c3 font-mono text-xs">{CHAIN_TOKEN[chain]}</span>
           </div>
         </div>
       </div>

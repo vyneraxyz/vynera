@@ -1,7 +1,10 @@
 import type { ApiPromise } from "@autonomys/auto-utils";
 import { createTransferToConsensusTxData, TRANSPORTER_PRECOMPILE_ADDRESS, transporterTransfer } from "@autonomys/auto-xdm";
 import type { Direction, TxPhase } from "@/types";
-import { PLATFORM_FEE_BPS } from "@/lib/constants";
+import type { FeeBreakdown } from "@/lib/fees";
+import { MAX_FEE_BPS } from "@/lib/fees";
+import { ensureChain, type EthProvider } from "@/lib/evm/wallet";
+import { findPendingTransfer, type XdmMessageRef } from "./tracking";
 import { verifyPrecompileCalldata, verifyXdmCall, type DecodedCall } from "./verify";
 
 // Minimal structural interfaces so we don't depend on either copy of @polkadot/types.
@@ -24,7 +27,12 @@ interface DispatchError {
   toString(): string;
 }
 
+interface TxEventRecord {
+  event: { section: string; method: string; data: { toJSON(): unknown } };
+}
+
 interface TxResult {
+  events?: TxEventRecord[];
   isReady: boolean;
   isBroadcast: boolean;
   isInBlock: boolean;
@@ -45,11 +53,13 @@ export interface XdmTransferParams {
   domainId: number;
   /** EVM chain ID for the Auto EVM domain (870 = Mainnet) */
   evmChainId?: number;
-  /** Platform fee in basis points (100 = 1%). Only applied for c2e via batchAll. */
-  platformFeeBps?: number;
+  /** Platform fee split (from lib/fees). Only applied for c2e via batchAll. */
+  fee?: FeeBreakdown & { referrer: string | null };
   /** Treasury SS58 address that receives the platform fee. */
   treasurySS58?: string;
   onPhaseChange: (phase: TxPhase, blockHash?: string) => void;
+  /** XDM message id, once known — lets the app follow the transfer to the destination */
+  onMessage?: (ref: XdmMessageRef) => void;
   onError: (message: string) => void;
 }
 
@@ -61,18 +71,14 @@ export async function buildAndSendXdm(params: XdmTransferParams): Promise<() => 
     toAddress,
     amountShannons,
     domainId,
-    platformFeeBps,
+    fee,
     treasurySS58,
     onPhaseChange,
+    onMessage,
     onError,
   } = params;
 
-  const withFee =
-    direction === "c2e" && !!platformFeeBps && !!treasurySS58;
-  const feeShannons = withFee
-    ? (amountShannons * BigInt(platformFeeBps)) / 10000n
-    : 0n;
-  const netShannons = amountShannons - feeShannons;
+  const withFee = direction === "c2e" && !!fee && fee.fee > 0n && !!treasurySS58;
 
   const destination =
     direction === "c2e"
@@ -86,10 +92,15 @@ export async function buildAndSendXdm(params: XdmTransferParams): Promise<() => 
 
   let extrinsic: ReturnType<typeof transporterTransfer>;
   try {
-    if (withFee && treasurySS58) {
-      const transferEx = transporterTransfer(api, destination, account, netShannons);
-      const feeEx = api.tx.balances.transferKeepAlive(treasurySS58, feeShannons);
-      extrinsic = api.tx.utility.batchAll([transferEx, feeEx]) as unknown as ReturnType<typeof transporterTransfer>;
+    if (withFee && fee && treasurySS58) {
+      const calls = [
+        transporterTransfer(api, destination, account, fee.net),
+        api.tx.balances.transferKeepAlive(treasurySS58, fee.treasury),
+      ];
+      if (fee.referral > 0n && fee.referrer) {
+        calls.push(api.tx.balances.transferKeepAlive(fee.referrer, fee.referral));
+      }
+      extrinsic = api.tx.utility.batchAll(calls) as unknown as ReturnType<typeof transporterTransfer>;
     } else {
       extrinsic = transporterTransfer(api, destination, account, amountShannons);
     }
@@ -98,8 +109,11 @@ export async function buildAndSendXdm(params: XdmTransferParams): Promise<() => 
       toAddress,
       amountShannons,
       domainId,
-      maxFeeBps: PLATFORM_FEE_BPS,
+      maxFeeBps: MAX_FEE_BPS,
       treasurySS58,
+      expectedFee: withFee && fee
+        ? { treasury: fee.treasury, referral: fee.referral, referrer: fee.referrer }
+        : undefined,
     });
   } catch (err: unknown) {
     onError(errorMessage(err, "Failed to build XDM extrinsic"));
@@ -157,6 +171,14 @@ export async function buildAndSendXdm(params: XdmTransferParams): Promise<() => 
         : undefined;
       const txHash = hex && hex !== "0x" ? hex : undefined;
 
+      const initiated = result.events?.find(
+        ({ event }) => event.section === "transporter" && event.method === "OutgoingTransferInitiated"
+      );
+      if (initiated && onMessage) {
+        const [chainId, messageId] = initiated.event.data.toJSON() as [unknown, [string, string]];
+        onMessage({ source: direction === "c2e" ? "consensus" : "evm", dstChainId: chainId, messageId });
+      }
+
       if (result.isReady) {
         onPhaseChange("ready", txHash);
       } else if (result.isBroadcast) {
@@ -189,38 +211,8 @@ export async function buildAndSendXdm(params: XdmTransferParams): Promise<() => 
 // ─── EVM wallet → Consensus via Transporter precompile ───────────────────────
 // Uses eth_sendTransaction (no eth_sign) — works with MetaMask, Rabby, etc.
 
-
-async function ensureEvmChain(chainId: number): Promise<void> {
-  type Eth = { request<T = unknown>(args: { method: string; params?: unknown[] }): Promise<T> };
-  const eth = ((typeof window !== "undefined" ? window : {}) as Record<string, unknown>).ethereum as Eth | undefined;
-  if (!eth) throw new Error("No EVM wallet available");
-  const hex = `0x${chainId.toString(16)}`;
-  try {
-    await eth.request({ method: "wallet_switchEthereumChain", params: [{ chainId: hex }] });
-  } catch (err: unknown) {
-    if ((err as { code?: number }).code === 4902) {
-      await eth.request({
-        method: "wallet_addEthereumChain",
-        params: [{
-          chainId: hex,
-          chainName: "Autonomys Auto EVM",
-          rpcUrls: ["https://auto-evm.mainnet.autonomys.xyz/"],
-          nativeCurrency: { name: "AI3", symbol: "AI3", decimals: 18 },
-        }],
-      });
-    } else {
-      throw err;
-    }
-  }
-  // Some wallets resolve the switch request without actually switching.
-  const active = await eth.request<string>({ method: "eth_chainId" });
-  if (parseInt(active, 16) !== chainId) {
-    throw new Error(`Wallet is on chain ${parseInt(active, 16)}, expected ${chainId}`);
-  }
-}
-
 export async function buildAndSendXdmEvm(params: XdmTransferParams): Promise<() => void> {
-  const { fromAddress, toAddress, amountShannons, evmChainId = 870, onPhaseChange, onError } = params;
+  const { api, fromAddress, toAddress, amountShannons, evmChainId = 870, onPhaseChange, onMessage, onError } = params;
 
   let calldata: string;
   let precompileAddress: string;
@@ -237,18 +229,15 @@ export async function buildAndSendXdmEvm(params: XdmTransferParams): Promise<() 
     return () => {};
   }
 
+  let eth: EthProvider;
   try {
-    await ensureEvmChain(evmChainId);
+    eth = await ensureChain(evmChainId);
   } catch (err: unknown) {
     onError(errorMessage(err, "Failed to switch to Auto EVM chain"));
     return () => {};
   }
 
   onPhaseChange("signing");
-
-  type Eth = { request<T = unknown>(args: { method: string; params?: unknown[] }): Promise<T> };
-  const eth = ((typeof window !== "undefined" ? window : {}) as Record<string, unknown>).ethereum as Eth | undefined;
-  if (!eth) { onError("No EVM wallet available"); return () => {}; }
 
   let txHash: string;
   try {
@@ -282,6 +271,14 @@ export async function buildAndSendXdmEvm(params: XdmTransferParams): Promise<() 
         if (receipt !== null) {
           if (receipt.status === "0x1") {
             if (!cancelled) onPhaseChange("inBlock", txHash);
+            // The precompile log has no message id; recover it from the pending-transfer map
+            findPendingTransfer(api, {
+              sender: { accountId20: fromAddress },
+              receiver: { accountId32: toAddress },
+              amount: amountShannons,
+            })
+              .then((ref) => { if (ref && !cancelled) onMessage?.(ref); })
+              .catch(() => {});
             await new Promise((r) => setTimeout(r, 2000));
             if (!cancelled) onPhaseChange("finalized");
           } else {
@@ -300,7 +297,7 @@ export async function buildAndSendXdmEvm(params: XdmTransferParams): Promise<() 
   return () => { cancelled = true; };
 }
 
-function errorMessage(err: unknown, fallback: string): string {
+export function errorMessage(err: unknown, fallback: string): string {
   if (err instanceof Error) return err.message || fallback;
   if (typeof err === "string") return err || fallback;
   return fallback;

@@ -46,12 +46,3 @@ export function computeMax(balanceShannons: bigint): bigint {
   const available = balanceShannons - RESERVE_SHANNONS - NETWORK_FEE_SHANNONS;
   return available > 0n ? available : 0n;
 }
-
-/** Check if an amount (Shannons) exceeds available balance. */
-export function isInsufficient(
-  amountShannons: bigint | null,
-  balanceShannons: bigint
-): boolean {
-  if (amountShannons === null || amountShannons <= 0n) return false;
-  return amountShannons + NETWORK_FEE_SHANNONS > balanceShannons;
-}

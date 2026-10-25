@@ -2,8 +2,18 @@
 
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Check, X, AlertCircle, AlertTriangle, Info } from "lucide-react";
-import { validateRecipient, type RecipientNotice } from "@/lib/autonomys/addresses";
+import { Check, X, AlertCircle, AlertTriangle, BookUser, Info, Star, Trash2 } from "lucide-react";
+import {
+  addAddress,
+  findSaved,
+  kindFor,
+  loadAddressBook,
+  recentRecipients,
+  removeAddress,
+  type SavedAddress,
+} from "@/lib/addressBook";
+import { toAutonomysAddress, truncateAddress, validateRecipient, type RecipientNotice } from "@/lib/autonomys/addresses";
+import { allTransfers } from "@/store/transactions";
 import type { Chain } from "@/types";
 
 interface Props {
@@ -18,6 +28,14 @@ interface Props {
 export function RecipientInput({ value, onChange, targetChain, notice, disabled }: Props) {
   const [debounced, setDebounced] = useState(value);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [book, setBook] = useState<SavedAddress[]>([]);
+  const [bookOpen, setBookOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [label, setLabel] = useState("");
+
+  // localStorage is only readable after mount
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => setBook(loadAddressBook()), []);
 
   useEffect(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
@@ -30,11 +48,24 @@ export function RecipientInput({ value, onChange, targetChain, notice, disabled 
   const validation = validateRecipient(debounced, targetChain);
   // Only show the notice once it describes what's actually typed
   const shownNotice = validation.state === "valid" && debounced === value ? notice : null;
-  const expectsEvm = targetChain === "evm";
+  const expectsEvm = targetChain !== "consensus";
   const placeholder = expectsEvm ? "0x…" : "su…";
   const defaultHelper = expectsEvm
     ? "EVM address expected (0x…)"
     : "Substrate SS58 address expected";
+
+  const kind = kindFor(targetChain);
+  const saved = validation.state === "valid" ? findSaved(book, debounced, targetChain) : undefined;
+  const entries = book.filter((e) => e.kind === kind);
+  const recents = bookOpen
+    ? recentRecipients(allTransfers(), targetChain).filter((a) => !findSaved(book, a, targetChain))
+    : [];
+  const display = (a: string) => (kind === "substrate" ? toAutonomysAddress(a) : a);
+
+  const pick = (a: string) => {
+    onChange(display(a));
+    setBookOpen(false);
+  };
 
   const inputClass =
     "input w-full rounded-xl px-3.5 py-3.5 pr-10 font-mono text-sm " +
@@ -46,12 +77,100 @@ export function RecipientInput({ value, onChange, targetChain, notice, disabled 
 
   return (
     <div className={disabled ? "opacity-50 pointer-events-none" : ""}>
-      <label
-        htmlFor="recipient-input"
-        className="text-[11px] uppercase tracking-wider text-c3 ml-1"
-      >
-        Recipient
-      </label>
+      <div className="flex items-center justify-between ml-1">
+        <label htmlFor="recipient-input" className="text-[11px] uppercase tracking-wider text-c3">
+          Recipient
+          {saved && <span className="normal-case tracking-normal text-accent ml-1.5">· {saved.label}</span>}
+        </label>
+        <div className="flex items-center gap-1">
+          {validation.state === "valid" && !saved && (
+            <button
+              type="button"
+              onClick={() => setSaving((v) => !v)}
+              className="btn-ghost rounded-md px-1.5 py-0.5 text-[11px] text-c3 flex items-center gap-1"
+              aria-expanded={saving}
+            >
+              <Star size={11} /> Save
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setBookOpen((v) => !v)}
+            className="btn-ghost rounded-md px-1.5 py-0.5 text-[11px] text-c3 flex items-center gap-1"
+            aria-expanded={bookOpen}
+            aria-controls="address-book"
+          >
+            <BookUser size={11} /> Address book
+          </button>
+        </div>
+      </div>
+
+      {saving && validation.state === "valid" && !saved && (
+        <form
+          className="mt-1.5 flex gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            setBook(addAddress({ label, address: debounced.trim(), kind }));
+            setSaving(false);
+            setLabel("");
+          }}
+        >
+          <input
+            autoFocus
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            placeholder="Label, e.g. My Consensus wallet"
+            maxLength={40}
+            className="input flex-1 rounded-lg px-3 py-2 text-sm"
+            aria-label="Label for this address"
+          />
+          <button type="submit" className="btn-accent rounded-lg px-3 text-sm text-white">
+            Save
+          </button>
+        </form>
+      )}
+
+      {bookOpen && (
+        <div id="address-book" className="mt-1.5 surface-2 rounded-xl p-1 max-h-60 overflow-auto">
+          {entries.length === 0 && recents.length === 0 && (
+            <p className="text-[12px] text-c3 px-2 py-2">
+              No saved {kind === "substrate" ? "Consensus" : "EVM"} addresses yet. Enter one and press Save.
+            </p>
+          )}
+          {entries.map((e) => (
+            <div key={e.address} className="flex items-center gap-2 rounded-lg hover:bg-white/[0.04]">
+              <button type="button" onClick={() => pick(e.address)} className="flex-1 text-left px-2 py-1.5 min-w-0">
+                <div className="text-sm text-c1 truncate">{e.label}</div>
+                <div className="text-[11px] font-mono text-c3">{truncateAddress(display(e.address), 8, 6)}</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setBook(removeAddress(e.address, e.kind))}
+                className="btn-ghost rounded-md p-1.5 mr-1 text-c3"
+                aria-label={`Remove ${e.label}`}
+              >
+                <Trash2 size={12} />
+              </button>
+            </div>
+          ))}
+          {recents.length > 0 && (
+            <>
+              <div className="text-[10px] uppercase tracking-wider text-c3 px-2 pt-2 pb-1">Recent</div>
+              {recents.map((a) => (
+                <button
+                  key={a}
+                  type="button"
+                  onClick={() => pick(a)}
+                  className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-white/[0.04] text-[12px] font-mono text-c2"
+                >
+                  {truncateAddress(display(a), 10, 8)}
+                </button>
+              ))}
+            </>
+          )}
+        </div>
+      )}
+
       <div className="mt-1.5 relative">
         <input
           id="recipient-input"

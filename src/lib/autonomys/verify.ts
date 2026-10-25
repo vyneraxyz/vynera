@@ -26,6 +26,8 @@ export interface ExpectedTransfer {
   maxFeeBps: number;
   /** Required when a fee is charged */
   treasurySS58?: string;
+  /** Exact split the UI showed; when set, the built calls must match it */
+  expectedFee?: { treasury: bigint; referral: bigint; referrer?: string | null };
 }
 
 export class TxVerificationError extends Error {
@@ -68,26 +70,45 @@ function checkTransporterCall(call: DecodedCall, exp: ExpectedTransfer, amount: 
 
 /**
  * Verify a Substrate extrinsic's call before signing.
- * Accepts either a bare transporter.transfer or utility.batchAll([transfer, feeTransfer]).
+ * Accepts a bare transporter.transfer, or utility.batchAll([transfer, treasuryFee, referralFee?]).
  */
 export function verifyXdmCall(call: DecodedCall, exp: ExpectedTransfer): void {
   if (exp.amountShannons <= 0n) fail("amount must be positive");
 
   if (call.section === "utility" && call.method === "batchAll") {
     const calls = call.args[0] as readonly DecodedCall[];
-    if (calls.length !== 2) fail(`expected 2 calls in batch, got ${calls.length}`);
-    const [transfer, feeCall] = calls;
-
-    if (feeCall.section !== "balances" || feeCall.method !== "transferKeepAlive") {
-      fail(`unexpected fee call ${feeCall.section}.${feeCall.method}`);
-    }
+    const [transfer, ...feeCalls] = calls;
+    if (feeCalls.length < 1 || feeCalls.length > 2) fail(`unexpected batch size ${calls.length}`);
     if (!exp.treasurySS58) fail("fee present but no treasury configured");
-    const [destArg, valueArg] = feeCall.args as Codec[];
-    const dest = (destArg.toJSON() as { id?: string }).id;
-    if (!dest || !samePublicKey(dest, exp.treasurySS58)) fail("fee recipient is not the treasury");
 
-    const fee = toBigInt(valueArg);
+    const parts = feeCalls.map((feeCall) => {
+      if (feeCall.section !== "balances" || feeCall.method !== "transferKeepAlive") {
+        fail(`unexpected fee call ${feeCall.section}.${feeCall.method}`);
+      }
+      const [destArg, valueArg] = feeCall.args as Codec[];
+      const dest = (destArg.toJSON() as { id?: string }).id;
+      if (!dest) fail("fee call has no destination");
+      return { dest, value: toBigInt(valueArg) };
+    });
+
+    const [treasuryPart, referralPart] = parts;
+    if (!samePublicKey(treasuryPart.dest, exp.treasurySS58)) fail("fee recipient is not the treasury");
+    const fee = parts.reduce((sum, p) => sum + p.value, 0n);
     if (fee * 10000n > exp.amountShannons * BigInt(exp.maxFeeBps)) fail("fee exceeds the allowed rate");
+
+    if (exp.expectedFee) {
+      const { treasury, referral, referrer } = exp.expectedFee;
+      if (treasuryPart.value !== treasury) fail("treasury fee differs from the quoted fee");
+      if (referral > 0n) {
+        if (!referralPart || !referrer) fail("referral share missing");
+        if (!samePublicKey(referralPart.dest, referrer)) fail("referral paid to an unexpected address");
+        if (referralPart.value !== referral) fail("referral share differs from the quote");
+      } else if (referralPart) {
+        fail("unexpected extra fee transfer");
+      }
+    } else if (referralPart) {
+      fail("unexpected extra fee transfer");
+    }
 
     checkTransporterCall(transfer, exp, exp.amountShannons - fee);
     return;

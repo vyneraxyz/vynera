@@ -28,7 +28,9 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     let cleanup = () => {};
 
     if (savedEvm) {
-      import("@/lib/evm/wallet").then(({ getConnectedEvmAccount, detectEvmWalletName, onEvmAccountsChanged }) => {
+      import("@/lib/evm/wallet").then(async ({ discoverEvmWallets, getConnectedEvmAccount, detectEvmWalletName, onEvmAccountsChanged }) => {
+        // Let EIP-6963 wallets announce so the previously chosen one is used
+        await discoverEvmWallets();
         getConnectedEvmAccount().then((addr) => {
           if (addr) setEvmAddress(addr, detectEvmWalletName());
         }).catch(() => {});

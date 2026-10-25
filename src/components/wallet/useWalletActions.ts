@@ -126,10 +126,11 @@ export function useWalletActions() {
     }
   }, [selectedAddress, setBalance, setBalanceLoading]);
 
-  const connectEvm = useCallback(async () => {
+  /** `rdns` picks one of several installed wallets (EIP-6963) */
+  const connectEvm = useCallback(async (rdns?: string) => {
     const { connectEvmWallet } = await import("@/lib/evm/wallet");
     try {
-      const conn = await connectEvmWallet();
+      const conn = await connectEvmWallet(rdns);
       setEvmAddress(conn.address, conn.walletName);
       try { localStorage.setItem("xdm-evm-address", conn.address); } catch { /* noop */ }
     } catch (err: unknown) {

@@ -9,21 +9,7 @@ export const MIN_TRANSFER_SHANNONS = 10n ** 18n;
 
 export const BLOCK_TIME_SECONDS = 3;
 
-export const PLATFORM_FEE_BPS = 300; // 3%
 export const TREASURY_SS58 = "subcfcaGG2VXuLoLjuHMCj4aeLPTFBtGUvTahGc6zLrsMSNVo";
-
-/** Consensus → EVM: 100 consensus blocks (~10 min) */
-export const C2E_CHALLENGE_BLOCKS = 100;
-/** EVM → Consensus: 14 400 domain blocks (~30 h) */
-export const E2C_CHALLENGE_BLOCKS = 14_400;
-
-export function challengeBlocks(direction: "c2e" | "e2c"): number {
-  return direction === "c2e" ? C2E_CHALLENGE_BLOCKS : E2C_CHALLENGE_BLOCKS;
-}
-
-export function challengeHint(direction: "c2e" | "e2c"): string {
-  return direction === "c2e" ? "100 blocks · ~10 min" : "14 400 blocks · ~30 h";
-}
 
 export const CHAINS = {
   Mainnet: {
@@ -40,13 +26,33 @@ export const CHAINS = {
       rpc: "wss://auto-evm.mainnet.autonomys.xyz/ws",
       genesisHash: "0xdb98c50e9ab1c34fe7927d97373f82e3c0d11490813a7c0b8dac2cd9a793a7dd",
       /** HTTP JSON-RPC endpoint for direct eth_getBalance queries */
-      httpRpc: "https://auto-evm.mainnet.autonomys.xyz/",
+      // The node serves HTTP JSON-RPC on the /ws path; the bare root returns 404
+      httpRpc: "https://auto-evm.mainnet.autonomys.xyz/ws",
       networkId: "mainnet",
       domainId: 0,
       chainId: 870,
       decimals: 18,
       explorerBase: "https://explorer.auto-evm.mainnet.autonomys.xyz",
     },
+    ethereum: {
+      chainId: 1,
+      httpRpc: "https://ethereum-rpc.publicnode.com",
+      explorerBase: "https://etherscan.io",
+    },
+  },
+} as const;
+
+/**
+ * Hyperlane warp route for AI3: native AI3 is locked in HypNative on Auto EVM,
+ * WAI3 is minted/burned by the synthetic router on Ethereum. One Mailbox
+ * address is deployed on both chains.
+ */
+export const HYPERLANE = {
+  mailbox: "0xA1382A17C25EDa9761A98fCfE82a105f337AeED2",
+  domain: { evm: 870, ethereum: 1 },
+  router: {
+    evm: "0x38ED676d20C9b026A2372D3A88a0bcEE54de3851",
+    ethereum: "0x363fca95f23e10c76ef793d62d92d39e89d83ac1",
   },
 } as const;
 
