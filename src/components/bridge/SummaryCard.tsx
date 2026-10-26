@@ -3,7 +3,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { Shield, ChevronDown, ArrowRight, Gift } from "lucide-react";
 import { formatAI3 } from "@/lib/autonomys/amounts";
-import { effectiveFeePct, FEE_BPS_ABOVE, FEE_BPS_BASE, FEE_TIER_THRESHOLD } from "@/lib/fees";
+import { effectiveFeePct, FEE_BPS_ABOVE, FEE_BPS_BASE, FEE_CAP, FEE_TIER_THRESHOLD } from "@/lib/fees";
 import { NETWORK_FEE_SHANNONS } from "@/lib/constants";
 import { CHAIN_LABEL, CHAIN_TOKEN, HOP_GAS_RESERVE, LEG_ETA, planRoute } from "@/lib/routes";
 import type { RouteQuote } from "@/lib/transfer/quote";
@@ -39,9 +39,10 @@ export function Row({
 }
 
 export const FEE_TIER_HINT =
-  FEE_BPS_BASE === FEE_BPS_ABOVE
+  (FEE_BPS_BASE === FEE_BPS_ABOVE
     ? `${FEE_BPS_BASE / 100}% of the amount`
-    : `${FEE_BPS_BASE / 100}% up to ${formatAI3(FEE_TIER_THRESHOLD, 0)} AI3, ${FEE_BPS_ABOVE / 100}% above`;
+    : `${FEE_BPS_BASE / 100}% up to ${formatAI3(FEE_TIER_THRESHOLD, 0)} AI3, ${FEE_BPS_ABOVE / 100}% above`) +
+  `, max ${formatAI3(FEE_CAP, 0)} AI3`;
 
 /** Fee, gas and per-leg route lines shared by the summary and the review dialog */
 export function QuoteRows({ from, to, quote }: { from: Chain; to: Chain; quote: RouteQuote | null }) {
